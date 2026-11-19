@@ -111,7 +111,11 @@ class ScanMatcher {
     double gnStepYawDeg = 0.5;
   };
 
-  explicit ScanMatcher(const Params& p = Params()) : p_(p) {}
+  // Two ctors (not `= Params()` default arg): a nested class's default
+  // member initializers can't be used in the enclosing class's default
+  // arguments - the enclosing class is incomplete there.
+  ScanMatcher() : p_() {}
+  explicit ScanMatcher(const Params& p) : p_(p) {}
 
   // points: base-frame (pre-processed). guess: EKF/odometry seed.
   MatchResult match(const OccupancyGrid& grid,
@@ -137,7 +141,7 @@ class ScanMatcher {
     }
     best = search(grid, points, fineSeed, p_.fineStepXY, p_.fineStepYawDeg, 1);
     // Pass 3: Gauss-Newton on the score.
-    best = gaussNewton(grid, points, best);
+    best = gaussNewton(grid, points, best.pose);
     return best;
   }
 

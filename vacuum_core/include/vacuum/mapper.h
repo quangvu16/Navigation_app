@@ -59,8 +59,10 @@ class Mapper {
     bool loop = false;
   };
 
-  explicit Mapper(const Params& p = Params())
-      : p_(p), matcher_(p.matcher) {}
+  // Two ctors: nested Params' default member initializers can't be used in
+  // the enclosing class's default arguments (same rule as ScanMatcher/Ekf).
+  Mapper() : p_(), matcher_(p_.matcher) {}
+  explicit Mapper(const Params& p) : p_(p), matcher_(p.matcher) {}
 
   // Feed one pre-processed scan with the EKF pose guess (map frame).
   // Returns the matched pose (map frame).

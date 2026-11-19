@@ -193,8 +193,8 @@ class OccupancyGrid {
     // Re-seat the old cells into the new allocation (origin may have moved).
     std::vector<float> fresh(static_cast<size_t>(nw) * nh, 0.0f);
     for (int y = 0; y < h_; ++y)
-      std::memcpy(&fresh[static_cast<size_t>(y + (gy0_ - ny0_)) * nw +
-                         (gx0_ - nx0_)],
+      std::memcpy(&fresh[static_cast<size_t>(y + (gy0_ - ny0)) * nw +
+                         (gx0_ - nx0)],
                   &cells_[static_cast<size_t>(y) * w_],
                   static_cast<size_t>(w_) * sizeof(float));
     cells_ = std::move(fresh);

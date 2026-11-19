@@ -47,6 +47,7 @@ if(VACUUM_BUILD_TESTS AND NOT ANDROID)
     tests/test_scan_transform.cpp
     tests/test_odometry.cpp
     tests/test_ekf.cpp
+    tests/test_mapping.cpp
   )
   target_link_libraries(vacuum_core_tests PRIVATE vacuum_core GTest::gtest_main)
   include(GoogleTest)
