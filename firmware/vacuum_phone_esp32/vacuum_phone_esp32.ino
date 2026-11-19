@@ -45,6 +45,7 @@
 
 #include "config.h"
 #include "phone_link.h"   // before lidar: the scan sender needs the owner
+#include "ble_link.h"     // FriendBot-style BLE transport (optional)
 #include "lidar_ld14.h"   // after phone_link: provides phLidarFreqHz/CrcErrors
 
 // ----------------------------------------------------------------------- WiFi
@@ -167,6 +168,7 @@ void setup() {
 
   lidarBegin();
   phBegin();      // starts sending zero commands at once, so the mainboard arms
+  phBleBegin();   // FriendBot-style BLE transport alongside UDP
 
   // Core 0: the two real-time tasks (hoverboard higher priority, §4.6).
   xTaskCreatePinnedToCore(lidarTask, "lidar", 4096, NULL, 2, NULL, 0);

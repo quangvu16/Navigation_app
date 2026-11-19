@@ -57,6 +57,10 @@ fun HomeScreen(
     val autoClean = RobotService.autoClean
     val eStop = RobotService.eStop
     var showAbout by remember { mutableStateOf(false) }
+    var showConnect by remember { mutableStateOf(false) }
+    // Bumped after a transport switch so the chip re-reads RobotService.link.
+    var linkVersion by remember { mutableStateOf(0) }
+    val linkType = remember(linkVersion) { transportOf(RobotService.link) }
 
     val batteryPct = when {
         eStop -> "—"
@@ -89,7 +93,23 @@ fun HomeScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Welcome home!", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            TextButton(onClick = { showAbout = true }) { Text("⚙") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Transport chip: SIM / Wi-Fi / BLE (FriendBot-style link).
+                TextButton(onClick = {
+                    showConnect = true
+                }) {
+                    Text(
+                        when (linkType) {
+                            Transport.SIM -> "📱 SIM"
+                            Transport.UDP -> "📶 Wi-Fi"
+                            Transport.BLE -> "蓝牙 BLE"
+                        },
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                TextButton(onClick = { showAbout = true }) { Text("⚙") }
+            }
         }
         Spacer(Modifier.height(4.dp))
         Text(
@@ -240,6 +260,12 @@ fun HomeScreen(
 
     if (showAbout) {
         AboutDialog(onDismiss = { showAbout = false })
+    }
+    if (showConnect) {
+        ConnectDialog(onDismiss = {
+            showConnect = false
+            linkVersion++   // refresh the chip after a possible switch
+        })
     }
 }
 

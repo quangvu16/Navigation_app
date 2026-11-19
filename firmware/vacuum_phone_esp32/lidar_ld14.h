@@ -515,11 +515,10 @@ static uint32_t fail_count = 0;
 static void sendPendingScan() {
   if (!shared_scan_ready)
     return;
-  if (!netUp())
+  if (!netUp() && !phBleClientConnected())
     return;
-  IPAddress owner_ip;
-  uint16_t  owner_port;
-  if (!phOwnerScanTarget(owner_ip, owner_port))
+  PhTarget owner;
+  if (!phOwnerScanTarget(owner))
     return;   // no owner: silence (the phone learns this from HBT2/HACK)
   if (xSemaphoreTake(scan_mutex, pdMS_TO_TICKS(5)) != pdTRUE)
     return;
@@ -551,26 +550,22 @@ static void sendPendingScan() {
   xSemaphoreGive(scan_mutex);
 
   const size_t len = LDS2_HEADER_LEN + (size_t)SCAN_BINS * 3;
-  bool ok = false;
-  if (udp.beginPacket(owner_ip, owner_port) == 1) {
-    udp.write(udp_buf, len);
-    ok = udp.endPacket() == 1;
-  }
+  // phSendTo() handles both transports (UDP send, or BLE chunked notify).
+  const bool ok = phSendTo(owner, udp_buf, (uint16_t)len);
 
   scan_id++;
   if (ok) {
     sent_count++;
   } else {
     fail_count++;
-    // UDP is fire-and-forget, so a failure here is local: no route, or the
-    // WiFi stack is out of buffers. Say so instead of going quiet - a silently
-    // dropped scan looks exactly like a dead LiDAR from the phone side.
+    // A failure here is local: no route / buffers full / client gone. Say so
+    // instead of going quiet - a silently dropped scan looks exactly like a
+    // dead LiDAR from the phone side.
     static uint32_t last_fail_ms = 0;
     if (millis() - last_fail_ms >= 2000) {
       last_fail_ms = millis();
-      Serial.printf("LDS2 send to %s:%u failed (%lu total)\n",
-                    owner_ip.toString().c_str(), owner_port,
-                    (unsigned long)fail_count);
+      Serial.printf("LDS2 send failed%s (%lu total)\n",
+                    owner.ble ? " [ble]" : "", (unsigned long)fail_count);
     }
   }
 

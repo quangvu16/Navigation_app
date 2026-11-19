@@ -52,6 +52,20 @@ SHA-1/base64 for the WebSocket handshake).
   `_vacuum` service; task layout unchanged (core 0: lidarTask +
   hoverboardTask@prio3; core 1: loop() + webTask) per §4.6.
 
+### BLE transport (FriendBot-style)
+
+- `ble_link.h`: GATT service/RX/TX with the FriendBot ESP32S3 UUIDs
+  verbatim (UART-style service, write-without-response RX, notify TX +
+  CCCD), MTU 517, advertising restart on disconnect. One GATT write = one
+  datagram into the shared `phHandleDatagram()` — HELO claim, PNG1
+  keepalive, HBC2, E-stop and the lease all work identically over BLE.
+  TX framing: `[0x00]` whole datagram or `[0x01][idx][count]` LDS2 chunks
+  (470 B). `phone_link.h` gained a `PhTarget` (UDP | BLE) reply abstraction
+  used by every sender (HACK/PNG2/HBT2/LDS2/BYE1).
+- Why: FriendBot's proven "phone drives the robot over BLE" path — no
+  router, instant connect, keeps working when Wi-Fi does not. Both FQBNs
+  still compile (WROOM 85 %, S3 84 % flash).
+
 ### Kept verbatim from the ROS sketch
 
 `hoverboard.h` (FOC USART driver, PI loop, stall/wrong-way cutouts — only

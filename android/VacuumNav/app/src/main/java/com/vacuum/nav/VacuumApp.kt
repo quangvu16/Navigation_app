@@ -11,6 +11,14 @@ import com.vacuum.nav.service.RobotService
 class VacuumApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        instance = this
         RobotService.start(this)
+    }
+
+    companion object {
+        /** App context for helpers that need it outside a composable (BLE scan). */
+        @Volatile
+        var instance: VacuumApp? = null
+            private set
     }
 }

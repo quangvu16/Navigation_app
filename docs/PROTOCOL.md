@@ -29,7 +29,7 @@ Conventions for **all** packets:
   counters of the sending machine. The phone stamps arrival with
   `SystemClock.elapsedRealtimeNanos()` and reconciles board time via PNG1/PNG2.
 
-## 1. Ports
+## 1. Ports and transports
 
 | Port | Proto | Direction | Content |
 |------|-------|-----------|---------|
@@ -44,6 +44,33 @@ defaults above are what the phone asks for.
 
 v1 sends everything to a fixed `DEST_IP` ("192.168.1.12", compile-time). v2
 sends only to the claimed owner.
+
+### 1.1 BLE transport (FriendBot-style GATT)
+
+The same v2 datagrams also travel over Bluetooth LE, ported from the
+FriendBot ESP32S3 project (its GATT UUIDs verbatim):
+
+| UUID | Role |
+|------|------|
+| `61653dc3-4021-4d1e-ba83-8b4eec61d613` | UART-style service |
+| `06386c14-86ea-4d71-811c-48f97c58f8c9` | RX — phone writes datagrams here (write-without-response) |
+| `9bf1103b-834c-47cf-b149-c9e4bcf778a7` | TX — board notifies datagrams here (+ CCCD) |
+
+Framing (BLE only; UDP needs no framing — one datagram is one packet):
+
+- **RX (phone → board):** one GATT write = one datagram (HELO / HBC2 /
+  PNG1 / HBC1). Feeds the *same* `phHandleDatagram()` as UDP, so claim,
+  lease, E-stop and the 300 ms watchdog behave identically on both paths.
+- **TX (board → phone):** every notify starts with a frame byte:
+  - `0x00` + datagram — whole packet (HBT2 / HACK / PNG2 / BYE1)
+  - `0x01` + idx u8 + count u8 + chunk — LDS2 split for the BLE MTU
+    (470-byte chunks; 1106 B → 3 notifies)
+
+MTU is negotiated to 517. Why BLE at all (FriendBot's lesson): no router,
+no AP mode, instant connection within ~10 m, and it keeps working when
+Wi-Fi does not. Wi-Fi stays the high-bandwidth path; BLE is the reliable
+control path. The owner model is unchanged: a BLE HELO claims ownership
+exactly like a UDP one (takeover flag, single owner).
 
 ---
 

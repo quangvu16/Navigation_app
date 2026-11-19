@@ -42,6 +42,7 @@ class RobotService : Service() {
     private var controlThread: Thread? = null
     private var alive = true
     private var tone: ToneGenerator? = null
+    private var scanJob: kotlinx.coroutines.Job? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -75,14 +76,7 @@ class RobotService : Service() {
         if (link == null) {
             link = SimRobotLink(RobotConfig())
         }
-
-        // Feed every scan to the lidar behaviours (avoidance/tracking/
-        // warning/following, ported from robot_ws/hoverboard_laser).
-        link?.let { l ->
-            serviceScope.launch {
-                l.scans.collect { lidarCtl.onScan(it) }
-            }
-        }
+        watchScans()   // feeds lidarCtl from the current link's scans
 
         // 20 Hz control thread. Precedence: E-STOP > lidar behaviour modes
         // (AVOID/FOLLOW) > auto-clean bump-and-go > manual joystick. EVERY
@@ -141,6 +135,24 @@ class RobotService : Service() {
             link?.setWheelRpm(0f, 0f)
         }
         return START_STICKY
+    }
+
+    /** Re-point the brain at a new transport (SIM / UDP / BLE), keeping the
+     *  control thread and lidar layer alive across the switch. */
+    private fun switchLink(newLink: RobotLink) {
+        val old = link
+        link = newLink
+        watchScans()
+        old?.setWheelRpm(0f, 0f)
+        old?.close()
+    }
+
+    private fun watchScans() {
+        scanJob?.cancel()
+        val l = link ?: return
+        scanJob = serviceScope.launch {
+            l.scans.collect { lidarCtl.onScan(it) }
+        }
     }
 
     override fun onDestroy() {
@@ -233,6 +245,24 @@ class RobotService : Service() {
             } else {
                 context.startService(intent)
             }
+        }
+
+        // ---- transports (SIM now; UDP and BLE are the real-robot paths) --
+        fun connectSim() {
+            instance?.switchLink(SimRobotLink(RobotConfig()))
+        }
+
+        fun connectUdp(host: String) {
+            instance?.switchLink(
+                com.vacuum.nav.robot.UdpRobotLink(RobotConfig(), host))
+        }
+
+        fun connectBle(address: String) {
+            val ctx = instance ?: return
+            val ble = com.vacuum.nav.robot.BleRobotLink(
+                ctx.applicationContext, RobotConfig())
+            instance?.switchLink(ble)
+            ble.start(address)
         }
 
         fun startCleaning() {

@@ -52,6 +52,68 @@ Hoverboard     hoverboard;
 float    phLidarFreqHz();
 uint32_t phLidarCrcErrors();
 
+// The UDP socket lives above the transports block: phSendTo() needs it.
+static WiFiUDP  ph_udp;
+static bool     ph_udp_open = false;
+
+// ------------------------------------------------------------ transports
+// A reply destination: UDP (the Wi-Fi link) or BLE (the FriendBot-style
+// Bluetooth link, ble_link.h). Every reply (HACK/PNG2/HBT2/LDS2/BYE1) goes
+// through phSendTo(); the owner may be on either transport.
+struct PhTarget {
+  bool ble = false;
+  IPAddress ip;
+  uint16_t port = 0;   // UDP only; BLE replies are GATT notifications
+};
+
+// Hooks installed by ble_link.h (null until the BLE stack starts).
+static bool (*ph_ble_notify)(const uint8_t * buf, uint16_t len) = nullptr;
+static bool (*ph_ble_connected_fn)() = nullptr;
+
+static bool phBleClientConnected() {
+  return ph_ble_connected_fn && ph_ble_connected_fn();
+}
+
+// BLE TX framing (Kotlin BleRobotLink parses this): a notify is either
+//   [0x00][datagram...]                     - one whole packet, or
+//   [0x01][idx][count][chunk...]            - LDS2 split for the MTU.
+static const uint8_t PH_BLE_FRAME_SINGLE = 0x00;
+static const uint8_t PH_BLE_FRAME_CHUNK  = 0x01;
+static const uint16_t PH_BLE_CHUNK_PAYLOAD = 470;
+
+static bool phSendTo(const PhTarget & t, const uint8_t * buf, uint16_t len) {
+  if (t.ble) {
+    if (!ph_ble_notify) return false;
+    if (len <= PH_BLE_CHUNK_PAYLOAD + 1) {
+      uint8_t frame[PH_BLE_CHUNK_PAYLOAD + 1];
+      frame[0] = PH_BLE_FRAME_SINGLE;
+      memcpy(frame + 1, buf, len);
+      return ph_ble_notify(frame, (uint16_t)(len + 1));
+    }
+    // Chunked (LDS2): [0x01][idx][count][slice].
+    const uint16_t count =
+        (uint16_t)((len + PH_BLE_CHUNK_PAYLOAD - 1) / PH_BLE_CHUNK_PAYLOAD);
+    for (uint16_t idx = 0; idx < count; ++idx) {
+      const uint16_t off = idx * PH_BLE_CHUNK_PAYLOAD;
+      uint16_t n = len - off;
+      if (n > PH_BLE_CHUNK_PAYLOAD) n = PH_BLE_CHUNK_PAYLOAD;
+      uint8_t frame[PH_BLE_CHUNK_PAYLOAD + 3];
+      frame[0] = PH_BLE_FRAME_CHUNK;
+      frame[1] = (uint8_t)idx;
+      frame[2] = (uint8_t)count;
+      memcpy(frame + 3, buf + off, n);
+      if (!ph_ble_notify(frame, (uint16_t)(n + 3))) return false;
+    }
+    return true;
+  }
+  if (!ph_udp_open) return false;
+  if (ph_udp.beginPacket(t.ip, t.port) == 1) {
+    ph_udp.write(buf, len);
+    return ph_udp.endPacket() == 1;
+  }
+  return false;
+}
+
 // ------------------------------------------------------------------- sizes
 static const uint16_t HBT2_LEN = 96;   // HBT1's 78 +18 extension bytes
 static const uint16_t HBC2_LEN = 16;
@@ -109,8 +171,6 @@ static void hbSetBuzzer(bool on) {
 }
 
 // ------------------------------------------------------------------- socket
-static WiFiUDP  ph_udp;
-static bool     ph_udp_open = false;
 static uint8_t  ph_rx_buf[64];        // HELO/HBC2/PNG1/HBC1 all fit
 static uint8_t  ph_tx_buf[HBT2_LEN];
 
@@ -118,9 +178,9 @@ static uint8_t  ph_tx_buf[HBT2_LEN];
 // (core 1) through phOwnerScanTarget(). portMUX because IPAddress (4 bytes,
 // but a struct copy) is not atomic against a concurrent claim.
 static portMUX_TYPE ph_owner_mux = portMUX_INITIALIZER_UNLOCKED;
-static IPAddress ph_owner;
-static uint16_t  ph_owner_telem_port = 0;  // HBT2/PNG2 destination
-static uint16_t  ph_owner_scan_port = 0;   // LDS2 destination
+static PhTarget ph_owner;                  // identity (UDP addr or BLE)
+static uint16_t  ph_owner_telem_port = 0;  // HBT2 destination (UDP only)
+static uint16_t  ph_owner_scan_port = 0;   // LDS2 destination (UDP only)
 static uint32_t  ph_session = 0;
 static uint32_t  ph_lease_deadline = 0;    // millis() after which we forget
 static bool      ph_owned = false;
@@ -164,13 +224,18 @@ static inline uint16_t sat16(float v) {
 }
 
 static bool phFromOwner(const IPAddress & ip) {
-  return ph_owned && ip == ph_owner;
+  return ph_owned && !ph_owner.ble && ip == ph_owner.ip;
+}
+static bool phFromOwner(const PhTarget & t) {
+  if (!ph_owned) return false;
+  if (t.ble) return ph_owner.ble;
+  return !ph_owner.ble && t.ip == ph_owner.ip;
 }
 
-static void phClaim(const IPAddress & ip, uint16_t telem_port,
+static void phClaim(const PhTarget & target, uint16_t telem_port,
                     uint16_t scan_port, uint32_t session) {
   portENTER_CRITICAL(&ph_owner_mux);
-  ph_owner = ip;
+  ph_owner = target;
   ph_owner_telem_port = telem_port;
   ph_owner_scan_port = scan_port;
   ph_session = session;
@@ -182,37 +247,36 @@ static void phClaim(const IPAddress & ip, uint16_t telem_port,
 // Send BYE1 to the current owner and forget it. The E-stop latch is NOT
 // cleared here (prompt §4.4: it survives lease expiry).
 static void phRelease(uint8_t reason) {
-  IPAddress old_ip;
-  uint16_t  old_port;
+  PhTarget old;
+  uint16_t old_port;
   portENTER_CRITICAL(&ph_owner_mux);
-  old_ip = ph_owner;
+  old = ph_owner;
   old_port = ph_owner_telem_port;
   ph_owned = false;
-  ph_owner = IPAddress();
+  ph_owner = PhTarget();
   ph_owner_telem_port = 0;
   ph_owner_scan_port = 0;
   portEXIT_CRITICAL(&ph_owner_mux);
 
-  if (old_ip != IPAddress() && ph_udp_open) {
+  if (ph_owned || old.ble || old.ip != IPAddress()) {
     ph_tx_buf[0] = 'B'; ph_tx_buf[1] = 'Y'; ph_tx_buf[2] = 'E'; ph_tx_buf[3] = '1';
     ph_tx_buf[4] = reason;
-    if (ph_udp.beginPacket(old_ip, old_port) == 1) {
-      ph_udp.write(ph_tx_buf, BYE1_LEN);
-      ph_udp.endPacket();
-    }
+    PhTarget to = old;
+    if (!to.ble) to.port = old_port;
+    phSendTo(to, ph_tx_buf, BYE1_LEN);
   }
   Serial.printf("phone_link: owner released (reason %u)\n", reason);
 }
 
 // Scan sender (core 1) asks where the latest scan goes.
-static bool phOwnerScanTarget(IPAddress & ip, uint16_t & port) {
+static bool phOwnerScanTarget(PhTarget & out) {
   bool ok;
   portENTER_CRITICAL(&ph_owner_mux);
   ok = ph_owned;
-  ip = ph_owner;
-  port = ph_owner_scan_port;
+  out = ph_owner;
+  if (!out.ble) out.port = ph_owner_scan_port;
   portEXIT_CRITICAL(&ph_owner_mux);
-  return ok && port != 0;
+  return ok && (out.ble || out.port != 0);
 }
 
 static bool phEstopLatched() { return ph_estop; }
@@ -242,7 +306,7 @@ static uint8_t phSonarReflexByte() {
 }
 
 // ----------------------------------------------------------------- HELO/HACK
-static void phSendHack(const IPAddress & ip, uint16_t port, uint8_t status,
+static void phSendHack(const PhTarget & to, uint8_t status,
                        uint32_t session) {
   ph_tx_buf[0] = 'H'; ph_tx_buf[1] = 'A'; ph_tx_buf[2] = 'C'; ph_tx_buf[3] = 'K';
   put16(ph_tx_buf, 4, PH_PROTO_VERSION);
@@ -261,24 +325,17 @@ static void phSendHack(const IPAddress & ip, uint16_t port, uint8_t status,
   memcpy(ph_tx_buf + 20, FW_VERSION, n);
   ph_tx_buf[20 + n] = '\0';
   const uint16_t len = (uint16_t)(20 + n + 1);
-  if (ph_udp.beginPacket(ip, port) == 1) {
-    ph_udp.write(ph_tx_buf, len);
-    ph_udp.endPacket();
-  }
+  phSendTo(to, ph_tx_buf, len);
 }
 
 // ------------------------------------------------------------------- PNG1/2
-static void phSendPing2(const IPAddress & ip, uint16_t port,
-                        const uint8_t * rx) {
+static void phSendPing2(const PhTarget & to, const uint8_t * rx) {
   ph_tx_buf[0] = 'P'; ph_tx_buf[1] = 'N'; ph_tx_buf[2] = 'G'; ph_tx_buf[3] = '2';
   put32(ph_tx_buf, 4, get32(rx, 4));    // seq echo
   put32(ph_tx_buf, 8, get32(rx, 8));    // phone_ms echo
   put32(ph_tx_buf, 12, millis());       // esp_ms
   put32(ph_tx_buf, 16, micros());       // esp_us (finer RTT)
-  if (ph_udp.beginPacket(ip, port) == 1) {
-    ph_udp.write(ph_tx_buf, PNG2_LEN);
-    ph_udp.endPacket();
-  }
+  phSendTo(to, ph_tx_buf, PNG2_LEN);
 }
 
 // -------------------------------------------------------------- HBT2 telemetry
@@ -355,138 +412,143 @@ static void phSendTelemetry() {
   put16(ph_tx_buf, 92, sat16(hoverboard.getOutputRPM(HB_RIGHT) * 10.0f));
   put16(ph_tx_buf, 94, (uint16_t)phLidarCrcErrors());
 
-  // Destination: the owner's announced telem port.
-  IPAddress ip;
-  uint16_t  port;
+  // Destination: the owner (UDP telem port or BLE notify).
+  PhTarget to;
   portENTER_CRITICAL(&ph_owner_mux);
-  ip = ph_owner;
-  port = ph_owner_telem_port;
+  to = ph_owner;
+  if (!to.ble) to.port = ph_owner_telem_port;
   portEXIT_CRITICAL(&ph_owner_mux);
-  if (port == 0) return;
-  if (ph_udp.beginPacket(ip, port) == 1) {
-    ph_udp.write(ph_tx_buf, HBT2_LEN);
-    ph_udp.endPacket();
-  }
+  if (!to.ble && to.port == 0) return;
+  phSendTo(to, ph_tx_buf, HBT2_LEN);
 }
 
 // ------------------------------------------------------------ receive + lease
 // Drain the socket, act on the newest valid datagram of each kind. ANY
 // datagram from the owner refreshes the lease (prompt §4.3).
+// One datagram from either transport. `from` is where replies go (UDP
+// source, or BLE notify). Shared by phPoll() (UDP) and ble_link.h (GATT).
+static void phHandleDatagram(const uint8_t * d, int n, const PhTarget & from) {
+  if (n < 4)
+    return;
+  const bool from_owner = phFromOwner(from);
+
+  if (from_owner)
+    ph_lease_deadline = millis() + PH_LEASE_TIMEOUT_MS;
+
+  if (n >= (int)HELO_LEN && memcmp(d, "HELO", 4) == 0) {
+    const uint16_t proto = get16(d, 4);
+    const uint16_t scan_port = get16(d, 6);
+    const uint16_t telem_port = get16(d, 8);
+    const uint16_t hflags = get16(d, 10);
+    const uint32_t session = get32(d, 12);
+
+    uint8_t status;
+    if (proto != PH_PROTO_VERSION) {
+      status = HACK_VERSION;
+    } else if (!ph_owned || (hflags & HELO_TAKEOVER) ||
+               (from_owner && session == ph_session)) {
+      if (ph_owned && !from_owner) {
+        // Stealing a live owner: tell the old phone first.
+        phRelease(BYE_TAKEOVER);
+      }
+      phClaim(from, telem_port, scan_port, session);
+      status = HACK_GRANTED;
+      Serial.printf("phone_link: owner %s claimed (telem %u, scan %u, "
+                    "session %08lx)%s\n",
+                    from.ble ? "BLE" : from.ip.toString().c_str(),
+                    telem_port, scan_port, (unsigned long)session,
+                    from.ble ? " [bluetooth]" : "");
+    } else {
+      status = HACK_DENIED;
+      Serial.printf("phone_link: HELO from %s denied (owner present)\n",
+                    from.ble ? "BLE" : from.ip.toString().c_str());
+    }
+    phSendHack(from, status, session);
+    return;
+  }
+
+  if (n >= (int)PNG1_LEN && memcmp(d, "PNG1", 4) == 0) {
+    if (from_owner) {
+      phSendPing2(from, d);  // reply to the source (UDP port / BLE notify)
+      ph_lease_deadline = millis() + PH_LEASE_TIMEOUT_MS;
+    }
+    return;
+  }
+
+  if (n >= (int)HBC2_LEN && memcmp(d, "HBC2", 4) == 0) {
+    if (!from_owner) { ph_cmd_bad++; return; }
+    const uint16_t seq = get16(d, 4);
+    const float want_l = get16s(d, 6) / 10.0f;
+    const float want_r = get16s(d, 8) / 10.0f;
+    const uint16_t cflags = get16(d, 10);
+    const uint32_t phone_ms = get32(d, 12);
+
+    if (cflags & HBC2_ESTOP) {
+      if (!ph_estop) {
+        ph_estop = true;
+        hoverboard.setWheelRPM(0.0f, 0.0f);  // latch with the wheels already zero
+        Serial.println("phone_link: E-STOP latched");
+      }
+    }
+    if (cflags & HBC2_ESTOP_CLEAR) {
+      if (ph_estop) {
+        ph_estop = false;
+        Serial.println("phone_link: E-STOP cleared");
+      }
+    }
+
+    ph_last_cmd_seq = seq;
+    ph_last_cmd_phone_ms = phone_ms;
+    ph_last_cmd_ms = millis();
+    ph_cmd_count++;
+
+    if (ph_estop) {
+      // Latched: every source is held at zero until the owner clears.
+      hoverboard.setWheelRPM(0.0f, 0.0f);
+    } else if (cflags & HBC2_ENABLE) {
+      if (!webDriveOwns()) hoverboard.setWheelRPM(want_l, want_r);
+    } else {
+      // Explicit stop (bit0 clear): still refreshes the timeout, like HBC1.
+      if (!webDriveOwns()) hoverboard.setWheelRPM(0.0f, 0.0f);
+    }
+    hb_buzzer_phone = (cflags & HBC2_BUZZER) != 0;
+    return;
+  }
+
+  // Legacy HBC1 from the owner only (one transition period, prompt §4.2).
+  if (n >= (int)HBC1_LEN && memcmp(d, "HBC1", 4) == 0) {
+    if (!from_owner) { ph_cmd_bad++; return; }
+    const float want_l = get16s(d, 6);
+    const float want_r = get16s(d, 8);
+    const uint16_t cflags = get16(d, 10);
+    ph_last_cmd_seq = get16(d, 4);
+    ph_last_cmd_phone_ms = 0;
+    ph_last_cmd_ms = millis();
+    ph_cmd_count++;
+    if (ph_estop) {
+      hoverboard.setWheelRPM(0.0f, 0.0f);
+    } else if (!webDriveOwns()) {
+      hoverboard.setWheelRPM((cflags & HBC_ENABLE) ? want_l : 0.0f,
+                             (cflags & HBC_ENABLE) ? want_r : 0.0f);
+    }
+    hb_buzzer_phone = (cflags & HBC_BUZZER) != 0;
+    return;
+  }
+
+  ph_cmd_bad++;
+}
+
 static void phPoll() {
   if (!ph_udp_open)
     return;
 
   while (ph_udp.parsePacket() > 0) {
     const int n = ph_udp.read(ph_rx_buf, sizeof(ph_rx_buf));
-    if (n < 4)
-      continue;
-    const IPAddress src = ph_udp.remoteIP();
-    const uint16_t sport = ph_udp.remotePort();
-    const bool from_owner = phFromOwner(src);
-
-    if (from_owner)
-      ph_lease_deadline = millis() + PH_LEASE_TIMEOUT_MS;
-
-    if (n >= (int)HELO_LEN && memcmp(ph_rx_buf, "HELO", 4) == 0) {
-      const uint16_t proto = get16(ph_rx_buf, 4);
-      const uint16_t scan_port = get16(ph_rx_buf, 6);
-      const uint16_t telem_port = get16(ph_rx_buf, 8);
-      const uint16_t hflags = get16(ph_rx_buf, 10);
-      const uint32_t session = get32(ph_rx_buf, 12);
-
-      uint8_t status;
-      if (proto != PH_PROTO_VERSION) {
-        status = HACK_VERSION;
-      } else if (!ph_owned || (hflags & HELO_TAKEOVER) ||
-                 (from_owner && session == ph_session)) {
-        if (ph_owned && !from_owner) {
-          // Stealing a live owner: tell the old phone first.
-          phRelease(BYE_TAKEOVER);
-        }
-        phClaim(src, telem_port, scan_port, session);
-        status = HACK_GRANTED;
-        Serial.printf("phone_link: owner %s claimed (telem %u, scan %u, "
-                      "session %08lx)\n",
-                      src.toString().c_str(), telem_port, scan_port,
-                      (unsigned long)session);
-      } else {
-        status = HACK_DENIED;
-        Serial.printf("phone_link: HELO from %s denied (owner present)\n",
-                      src.toString().c_str());
-      }
-      phSendHack(src, sport, status, session);
-      continue;
-    }
-
-    if (n >= (int)PNG1_LEN && memcmp(ph_rx_buf, "PNG1", 4) == 0) {
-      if (from_owner) {
-        phSendPing2(src, sport, ph_rx_buf);  // reply to the SOURCE port
-        ph_lease_deadline = millis() + PH_LEASE_TIMEOUT_MS;
-      }
-      continue;
-    }
-
-    if (n >= (int)HBC2_LEN && memcmp(ph_rx_buf, "HBC2", 4) == 0) {
-      if (!from_owner) { ph_cmd_bad++; continue; }
-      const uint16_t seq = get16(ph_rx_buf, 4);
-      const float want_l = get16s(ph_rx_buf, 6) / 10.0f;
-      const float want_r = get16s(ph_rx_buf, 8) / 10.0f;
-      const uint16_t cflags = get16(ph_rx_buf, 10);
-      const uint32_t phone_ms = get32(ph_rx_buf, 12);
-
-      if (cflags & HBC2_ESTOP) {
-        if (!ph_estop) {
-          ph_estop = true;
-          hoverboard.setWheelRPM(0.0f, 0.0f);  // latch with the wheels already zero
-          Serial.println("phone_link: E-STOP latched");
-        }
-      }
-      if (cflags & HBC2_ESTOP_CLEAR) {
-        if (ph_estop) {
-          ph_estop = false;
-          Serial.println("phone_link: E-STOP cleared");
-        }
-      }
-
-      ph_last_cmd_seq = seq;
-      ph_last_cmd_phone_ms = phone_ms;
-      ph_last_cmd_ms = millis();
-      ph_cmd_count++;
-
-      if (ph_estop) {
-        // Latched: every source is held at zero until the owner clears.
-        hoverboard.setWheelRPM(0.0f, 0.0f);
-      } else if (cflags & HBC2_ENABLE) {
-        if (!webDriveOwns()) hoverboard.setWheelRPM(want_l, want_r);
-      } else {
-        // Explicit stop (bit0 clear): still refreshes the timeout, like HBC1.
-        if (!webDriveOwns()) hoverboard.setWheelRPM(0.0f, 0.0f);
-      }
-      hb_buzzer_phone = (cflags & HBC2_BUZZER) != 0;
-      continue;
-    }
-
-    // Legacy HBC1 from the owner only (one transition period, prompt §4.2).
-    if (n >= (int)HBC1_LEN && memcmp(ph_rx_buf, "HBC1", 4) == 0) {
-      if (!from_owner) { ph_cmd_bad++; continue; }
-      const float want_l = get16s(ph_rx_buf, 6);
-      const float want_r = get16s(ph_rx_buf, 8);
-      const uint16_t cflags = get16(ph_rx_buf, 10);
-      ph_last_cmd_seq = get16(ph_rx_buf, 4);
-      ph_last_cmd_phone_ms = 0;
-      ph_last_cmd_ms = millis();
-      ph_cmd_count++;
-      if (ph_estop) {
-        hoverboard.setWheelRPM(0.0f, 0.0f);
-      } else if (!webDriveOwns()) {
-        hoverboard.setWheelRPM((cflags & HBC_ENABLE) ? want_l : 0.0f,
-                               (cflags & HBC_ENABLE) ? want_r : 0.0f);
-      }
-      hb_buzzer_phone = (cflags & HBC_BUZZER) != 0;
-      continue;
-    }
-
-    ph_cmd_bad++;
+    PhTarget from;
+    from.ble = false;
+    from.ip = ph_udp.remoteIP();
+    from.port = ph_udp.remotePort();
+    phHandleDatagram(ph_rx_buf, n, from);
   }
 
   // Lease expiry: forget the owner, wheels to zero (BYE1 goes out first).
@@ -494,6 +556,13 @@ static void phPoll() {
     hoverboard.setWheelRPM(0.0f, 0.0f);
     phRelease(BYE_LEASE_EXPIRED);
   }
+}
+
+// BLE entry point (ble_link.h): one GATT write = one datagram.
+static void phHandleBle(const uint8_t * data, int n) {
+  PhTarget from;
+  from.ble = true;
+  phHandleDatagram(data, n, from);
 }
 
 // ------------------------------------------------------------------- reflex
