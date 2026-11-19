@@ -66,10 +66,16 @@ Java_com_vacuum_nav_robot_NativeEngine_nativeCreate(
   }
 
   auto* engine = new Engine();
-  // Realistic noisy physics in the app; tests use the host build with quiet
-  // noise for exactness. A later Settings switch can expose the seed.
+  // Start at the world centre: the default room's centre is (2, 2) and a
+  // real floor plan's centre is almost always free space. Starting at
+  // (0, 0) put the robot inside the wall — half the scans returned nothing.
+  // (Phase 3's "set pose" screen will override this.)
+  const vacuum::Vec2 centre(
+      world.origin().x + world.width() * world.resolution() * 0.5,
+      world.origin().y + world.height() * world.resolution() * 0.5);
   engine->robot = std::make_unique<SimRobot>(cfg, std::move(world), SimNoise(),
                                              static_cast<uint32_t>(seed));
+  engine->robot->setPose(Pose2D(centre.x, centre.y, 0.0));
   return reinterpret_cast<jlong>(engine);
 }
 

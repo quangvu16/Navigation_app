@@ -19,3 +19,6 @@ local.properties
 .idea/
 *.iml
 .vscode/
+
+# Firmware credentials (never committed)
+firmware/**/secrets.h
