@@ -140,6 +140,17 @@ class NavEngine(private val config: RobotConfig) : AutoCloseable {
         }
     }
 
+    /** Phase 6: best frontier goal from (x, y), or null when exploration
+     *  is finished (no reachable frontier > 0.5 m). */
+    fun exploreGoal(x: Float, y: Float): Pair<Double, Double>? {
+        if (handle == 0L) return null
+        val g = nativeExploreGoal(handle, x, y) ?: return null
+        return g[0].toDouble() to g[1].toDouble()
+    }
+
+    private external fun nativeExploreGoal(handle: Long, px: Float,
+                                           py: Float): FloatArray?
+
     private external fun nativeCreate(configJson: String): Long
     private external fun nativeDestroy(handle: Long)
     private external fun nativeSetMap(handle: Long, snapshot: ByteArray): Boolean

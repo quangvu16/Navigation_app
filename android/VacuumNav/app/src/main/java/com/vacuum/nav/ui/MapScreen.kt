@@ -143,6 +143,10 @@ fun MapScreen(
             ) {
                 RailButton("🚫", "Zones") { onOpenZones() }
                 RailButton("🕹", "Drive") { onOpenDrive() }
+                RailButton(
+                    if (RobotService.exploreActive) "🛑" else "🧭",
+                    if (RobotService.exploreActive) "Stop" else "Explore",
+                ) { RobotService.toggleExplore() }
                 RailButton(if (showGrid) "▦" else "▢", "Grid") {
                     showGrid = !showGrid
                 }
@@ -166,6 +170,8 @@ fun MapScreen(
             if (navLabel != null) {
                 ModeHint(navLabel + if (navState.active)
                     "  ·  long-press to re-goal, joystick to cancel" else "")
+            } else if (RobotService.exploreActive) {
+                ModeHint("Exploring… (frontier search, §6)")
             } else if (!navState.active && navState.goal == null) {
                 ModeHint("Long-press the map to drive there")
             }

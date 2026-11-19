@@ -100,6 +100,37 @@ class RobotService : Service() {
                     RunStats.onPose(t.pose.x.toDouble(),
                         t.pose.y.toDouble(), cfg.brushWidthM)
 
+                    // Phase 6: frontier exploration drives go-to goals in
+                    // a loop; finished -> return to the start pose.
+                    if (exploreActive && !goToActive && !eStop) {
+                        val n = nav
+                        if (n == null) {
+                            exploreActive = false
+                        } else {
+                            val g = n.exploreGoal(t.pose.x, t.pose.y)
+                            if (g != null) {
+                                if (exploreStart == null)
+                                    exploreStart =
+                                        t.pose.x.toDouble() to
+                                            t.pose.y.toDouble()
+                                if (!startGoTo(applicationContext, g.first,
+                                        g.second)
+                                ) {
+                                    // Frontier behind a keepout/wall:
+                                    // exploration is done for now.
+                                    exploreActive = false
+                                }
+                            } else {
+                                // No frontier left: return to start (§5).
+                                exploreActive = false
+                                val s = exploreStart
+                                if (s != null)
+                                    startGoTo(applicationContext, s.first,
+                                        s.second)
+                            }
+                        }
+                    }
+
                     val cmd: Pair<Double, Double> = when {
                         eStop -> 0.0 to 0.0
                         // Phase 4: go-to-goal owns the wheels until it
@@ -296,6 +327,32 @@ class RobotService : Service() {
         @Volatile
         var goToActive = false
             private set
+
+        /** Phase 6: frontier exploration loop running. */
+        @Volatile
+        var exploreActive = false
+            private set
+
+        /** Where exploration started (returned to when finished, §5). */
+        @Volatile
+        private var exploreStart: Pair<Double, Double>? = null
+
+        /** Toggle frontier exploration from the Map rail button. */
+        fun toggleExplore() {
+            if (exploreActive) {
+                exploreActive = false
+                cancelGoTo()
+            } else {
+                // Need a map to explore against (the mapper builds it as
+                // the robot drives; before that there is nothing).
+                if (nav?.state?.value?.let { true } != true) return
+                exploreStart = null   // captured on the first goal below
+                autoClean = false
+                RunStats.stopRun()
+                lidarCtl.setMode(LidarMode.MANUAL)
+                exploreActive = true
+            }
+        }
 
         /** Lidar behaviours (avoidance / tracking / warning / following),
          *  ported from robot_ws/hoverboard_laser. UI reads [LidarBehaviorController.state]. */

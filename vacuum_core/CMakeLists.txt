@@ -51,6 +51,7 @@ if(VACUUM_BUILD_TESTS AND NOT ANDROID)
     tests/test_planning.cpp
     tests/test_localization.cpp
     tests/test_goto.cpp
+    tests/test_exploration.cpp
   )
   target_link_libraries(vacuum_core_tests PRIVATE vacuum_core GTest::gtest_main)
   include(GoogleTest)

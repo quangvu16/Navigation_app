@@ -350,6 +350,7 @@ Java_com_vacuum_nav_robot_MapperEngine_nativeSnapshot(JNIEnv* env, jobject,
 // ---------------------------------------------------------------------------
 
 #include "vacuum/costmap.h"
+#include "vacuum/frontier.h"
 #include "vacuum/goto_controller.h"
 
 namespace {
@@ -357,6 +358,7 @@ namespace {
 struct NavHolder {
   std::mutex mutex;
   RobotConfig cfg;
+  vacuum::OccupancyGrid grid;   // retained for frontier queries (Phase 6)
   vacuum::Costmap cm;
   vacuum::GoToController gc;
   bool hasMap = false;
@@ -379,19 +381,20 @@ struct NavHolder {
     std::memcpy(&res, d + 16, 4);
     if (w <= 0 || h <= 0 || res <= 0 || n < 20 + static_cast<size_t>(w) * h)
       return false;
-    vacuum::OccupancyGrid grid(res);
+    vacuum::OccupancyGrid fresh(res);
     // Grow the grid to cover (gx0, gy0, w, h) by writing the corners first.
-    grid.setLogOdds(gx0, gy0, -1.0f);
-    grid.setLogOdds(gx0 + w - 1, gy0 + h - 1, -1.0f);
+    fresh.setLogOdds(gx0, gy0, -1.0f);
+    fresh.setLogOdds(gx0 + w - 1, gy0 + h - 1, -1.0f);
     for (int y = 0; y < h; ++y)
       for (int x = 0; x < w; ++x) {
         const uint8_t c = d[20 + static_cast<size_t>(y) * w + x];
         // 0 free, 1 occupied, 2 unknown.
-        grid.setLogOdds(gx0 + x, gy0 + y,
-                        c == 1 ? vacuum::OccupancyGrid::kLOddMax
-                               : c == 0 ? -1.0f : 0.0f);
+        fresh.setLogOdds(gx0 + x, gy0 + y,
+                         c == 1 ? vacuum::OccupancyGrid::kLOddMax
+                                : c == 0 ? -1.0f : 0.0f);
       }
-    cm.setStatic(grid);
+    grid = fresh;   // keep for frontier exploration (Phase 6)
+    cm.setStatic(fresh);
     hasMap = true;
     return true;
   }
@@ -547,6 +550,26 @@ Java_com_vacuum_nav_robot_NavEngine_nativePath(JNIEnv* env, jobject,
   jfloatArray arr = env->NewFloatArray(static_cast<jsize>(flat.size()));
   env->SetFloatArrayRegion(arr, 0, static_cast<jsize>(flat.size()),
                            flat.data());
+  return arr;
+}
+
+// Phase 6: best frontier goal from the current pose, or null when every
+// reachable frontier is smaller than 0.5 m (exploration finished).
+JNIEXPORT jfloatArray JNICALL
+Java_com_vacuum_nav_robot_NavEngine_nativeExploreGoal(JNIEnv* env, jobject,
+                                                      jlong handle,
+                                                      jfloat px, jfloat py) {
+  NavHolder* n = fromNav(handle);
+  if (!n) return nullptr;
+  std::lock_guard<std::mutex> lock(n->mutex);
+  if (!n->hasMap) return nullptr;
+  const vacuum::FrontierExplorer ex;
+  const auto goal = ex.bestGoal(n->grid, vacuum::Pose2D(px, py, 0.0));
+  if (!goal.has_value()) return nullptr;
+  jfloat out[2] = {static_cast<jfloat>(goal->x),
+                   static_cast<jfloat>(goal->y)};
+  jfloatArray arr = env->NewFloatArray(2);
+  env->SetFloatArrayRegion(arr, 0, 2, out);
   return arr;
 }
 
