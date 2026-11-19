@@ -217,6 +217,10 @@ robot is `src/robot_navigation/param/hoverboard.yaml` (MPPI), launched by
     `~/.cache/vacuum-nav/gradle-project-cache`;
   - vendored toolchains in `.toolchain/` (CMake 3.31.6, Googletest 1.15.2,
     Gradle 9.9.1 — downloaded archives, extracted in place) had their
-    sidecars purged after extraction (`find … -name "._*" -delete`).
+    sidecars purged after extraction (`find … -name "._*" -delete`);
+  - git operations write pack files with provenance xattrs, so `._pack-*`
+    sidecars appear inside `.git/objects/pack/` and make git print
+    "non-monotonic index" errors — purge with
+    `find .git -name "._*" -delete` before/after commits if they reappear.
 - Tooling downloaded for the build lives in `.toolchain/` (not committed);
   the project's Gradle wrapper (committed) reproduces the build elsewhere.
