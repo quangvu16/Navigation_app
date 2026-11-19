@@ -27,11 +27,16 @@ import com.vacuum.nav.ui.theme.RobotOrange
 import kotlin.math.cos
 import kotlin.math.sin
 
+private const val COS30 = 0.8660254f
+
 /**
  * The live map. World coordinates are metres (x right, y up); screen y is
  * down, so every draw flips Y (prompt §6 - goals and overlays always travel
  * in world metres, never pixels). Pan + pinch-zoom via one transformable
  * state; zones drawn as translucent red rectangles (Roborock-style no-go).
+ *
+ * [iso] = true draws the same world in a 3D isometric view (the "Real-Time
+ * Mapping" look). Only the projection changes; all data stays in metres.
  */
 @Composable
 fun MapCanvas(
@@ -44,6 +49,9 @@ fun MapCanvas(
     modifier: Modifier = Modifier,
     zones: List<NoGoZone> = emptyList(),
     showGrid: Boolean = true,
+    iso: Boolean = false,
+    targetPos: Pair<Double, Double>? = null,   // tracked lidar target
+    warning: Boolean = false,                  // proximity buzzer active
     onScreenTransform: ((scale: Float, pxPerM: Float) -> Unit)? = null,
 ) {
     var scale by remember { mutableFloatStateOf(90f) }     // px per metre
@@ -64,7 +72,8 @@ fun MapCanvas(
         val cy = size.height / 2f + offset.y
 
         fun toScreen(wx: Double, wy: Double): Offset =
-            Offset(cx + (wx * scale).toFloat(), cy - (wy * scale).toFloat())
+            if (iso) isoPoint(wx, wy, cx, cy, scale)
+            else Offset(cx + (wx * scale).toFloat(), cy - (wy * scale).toFloat())
 
         if (showGrid) drawGrid(::toScreen)
         drawZones(zones, ::toScreen)
@@ -84,20 +93,61 @@ fun MapCanvas(
 
         drawSonar(config, sonar, robotX, robotY, robotTheta, ::toScreen)
 
-        // Robot: body disc + heading arrow (x forward).
+        // ---- lidar behaviour overlays -----------------------------------
+        // Tracked target (laser_Tracker selection): green marker + line of
+        // sight from the robot.
+        targetPos?.let { (tx, ty) ->
+            val tp = toScreen(tx, ty)
+            val rp0 = toScreen(robotX.toDouble(), robotY.toDouble())
+            drawLine(
+                color = Color(0xFF4CAF50).copy(alpha = 0.7f),
+                start = rp0, end = tp, strokeWidth = 3f,
+            )
+            drawCircle(color = Color(0xFF4CAF50), radius = 10f, center = tp)
+            drawCircle(color = Color.White, radius = 10f, center = tp,
+                style = Stroke(width = 3f))
+        }
+        // Warning (laser_Warning buzzer): red frame around the viewport.
+        if (warning) {
+            val inset = 6f
+            drawRect(
+                color = DangerRed,
+                topLeft = Offset(inset, inset),
+                size = Size(size.width - 2 * inset, size.height - 2 * inset),
+                style = Stroke(width = 8f),
+            )
+        }
+
+        // Robot: body + heading arrow (x forward). In iso mode the body is a
+        // short cylinder: shadow on the floor, raised top disc.
         val rp = toScreen(robotX.toDouble(), robotY.toDouble())
-        drawCircle(
+        val r = config.robotRadiusM.toFloat() * scale
+        val lift = if (iso) 10f else 0f
+        val top = Offset(rp.x, rp.y - lift)
+        if (iso) {
+            drawOval(
+                color = Color.Black.copy(alpha = 0.35f),
+                topLeft = Offset(rp.x - r, rp.y - r * 0.5f),
+                size = Size(2 * r, r),
+            )
+            drawOval(
+                color = Color(0xFFB34700),
+                topLeft = Offset(top.x - r, top.y - r * 0.5f + 6f),
+                size = Size(2 * r, r),
+            )
+        }
+        drawOval(
             color = RobotOrange,
-            radius = config.robotRadiusM.toFloat() * scale,
-            center = rp,
-            alpha = 0.9f,
+            topLeft = Offset(top.x - r, top.y - r * 0.5f),
+            size = Size(2 * r, r),
         )
-        val arrowLen = (config.robotRadiusM * 1.2).toFloat() * scale
-        val tip = Offset(
-            rp.x + arrowLen * cos(robotTheta),
-            rp.y - arrowLen * sin(robotTheta),  // Y flip again
-        )
-        drawLine(color = Color.White, start = rp, end = tip, strokeWidth = 6f)
+
+        val armM = config.robotRadiusM * 1.2
+        val tip = toScreen(
+            robotX + armM * cos(robotTheta),
+            robotY + armM * sin(robotTheta),
+        ).let { Offset(it.x, it.y - lift) }
+        drawLine(color = Color.White, start = top, end = tip, strokeWidth = 6f)
         val path = Path().apply {
             moveTo(tip.x, tip.y)
             lineTo(tip.x - 14f * cos(robotTheta - 0.5f),
@@ -108,6 +158,13 @@ fun MapCanvas(
         }
         drawPath(path, Color.White)
     }
+}
+
+/** Isometric projection of a world point (metres, y up) to screen pixels. */
+private fun isoPoint(wx: Double, wy: Double, cx: Float, cy: Float, s: Float): Offset {
+    val x = wx.toFloat()
+    val y = wy.toFloat()
+    return Offset(cx + (x - y) * COS30 * s, cy - (x + y) * 0.5f * s)
 }
 
 /** Exposes the current view transform so editors can hit-test touches. */

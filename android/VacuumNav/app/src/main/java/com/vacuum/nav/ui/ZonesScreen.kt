@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -84,6 +85,7 @@ fun ZonesScreen(modifier: Modifier = Modifier) {
         // ---- the editor canvas ------------------------------------------
         Canvas(
             Modifier.weight(1f).fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
                 .background(MaterialTheme.colorScheme.surface)
                 .pointerInput(zones.size) {
                     val cx = size.width / 2f
@@ -260,7 +262,8 @@ fun ZonesScreen(modifier: Modifier = Modifier) {
                 Modifier.weight(1f),
                 enabled = dirty,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = DangerRed,
+                    containerColor = Color(0xFF2BB3A0),
+                    contentColor = Color(0xFF06201C),
                 ),
             ) { Text("Save", fontWeight = FontWeight.Bold) }
         }

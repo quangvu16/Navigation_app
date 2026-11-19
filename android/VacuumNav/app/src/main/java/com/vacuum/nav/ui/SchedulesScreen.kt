@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vacuum.nav.data.Schedule
 import com.vacuum.nav.data.ScheduleStore
+import androidx.compose.ui.graphics.Color
 
 /**
  * Schedules, in the shape of the reference screen: two groups (Scheduled
@@ -138,9 +140,9 @@ private fun ScheduleRow(s: Schedule, onToggle: (Boolean) -> Unit,
                         onClick: () -> Unit) {
     Card(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface
         ),
     ) {
         Row(
@@ -160,7 +162,14 @@ private fun ScheduleRow(s: Schedule, onToggle: (Boolean) -> Unit,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Switch(checked = s.enabled, onCheckedChange = onToggle)
+            Switch(
+                checked = s.enabled,
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = Color(0xFF2BB3A0),
+                    checkedThumbColor = Color.White,
+                ),
+            )
         }
     }
 }

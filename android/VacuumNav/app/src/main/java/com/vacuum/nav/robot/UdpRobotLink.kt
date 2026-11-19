@@ -49,6 +49,7 @@ class UdpRobotLink(
     @Volatile private var rpmL = 0f
     @Volatile private var rpmR = 0f
     @Volatile private var estopRequested = false
+    @Volatile private var buzzer = false   // HBC2 flag bit1 -> ESP32 GPIO25
     @Volatile private var lastTelemMs = 0L
     @Volatile private var lastScanMs = 0L
     @Volatile private var lastHack: Packets.Hack? = null
@@ -68,6 +69,10 @@ class UdpRobotLink(
     fun setEstop(on: Boolean) {
         estopRequested = on
         if (on) setWheelRpm(0f, 0f)
+    }
+
+    override fun setBuzzer(on: Boolean) {
+        buzzer = on
     }
 
     override fun close() {
@@ -144,7 +149,8 @@ class UdpRobotLink(
                 if (claimed && now - lastHbc2 >= 1000L / config.commandRateHz) {
                     lastHbc2 = now
                     seq++
-                    val flags = if (estopRequested) 0x0005 else 0x0001
+                    var flags = if (estopRequested) 0x0005 else 0x0001
+                    if (buzzer) flags = flags or 0x0002   // HBC2_BUZZER
                     val (l, r) = if (estopRequested) Pair(0f, 0f) else Pair(rpmL, rpmR)
                     send(Packets.buildHbc2(seq,
                         (l * 10).toInt().coerceIn(-32768, 32767),

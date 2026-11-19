@@ -52,5 +52,9 @@ interface RobotLink {
     /** Wheel speed targets in RPM (+ = forward). Zero on stop/e-stop paths. */
     fun setWheelRpm(rpmL: Float, rpmR: Float)
 
+    /** Buzzer (laser_Warning's /Buzzer -> HBC2 flag bit1 on the real link;
+     *  no-op in the simulator, which beeps on the phone instead). */
+    fun setBuzzer(on: Boolean) {}
+
     fun close()
 }

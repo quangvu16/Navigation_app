@@ -104,9 +104,9 @@ fun HomeScreen(
         // Robot card (reference: product shot + battery + Enter).
         Card(
             Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = Color(0xFF14213D)
             ),
             elevation = CardDefaults.cardElevation(6.dp),
         ) {
@@ -121,13 +121,14 @@ fun HomeScreen(
                     Text(
                         RobotConfig().robotName,
                         fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
                     )
                     Surface(
                         shape = RoundedCornerShape(50),
                         color = when {
                             eStop -> MaterialTheme.colorScheme.error
                             autoClean -> RobotOrange
-                            else -> Color(0xFF2E7D32)
+                            else -> Color(0xFF7BE0B0)
                         }.copy(alpha = 0.15f),
                     ) {
                         Text(
@@ -141,7 +142,7 @@ fun HomeScreen(
                             color = when {
                                 eStop -> MaterialTheme.colorScheme.error
                                 autoClean -> RobotOrange
-                                else -> Color(0xFF2E7D32)
+                                else -> Color(0xFF7BE0B0)
                             },
                             modifier = Modifier.padding(
                                 horizontal = 10.dp, vertical = 4.dp),
@@ -167,12 +168,12 @@ fun HomeScreen(
                     "🔋 $batteryPct",
                     fontSize = 28.sp, fontWeight = FontWeight.Bold,
                     color = if (eStop) MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.onSurface,
+                    else Color.White,
                 )
                 Text(
                     "Battery · ${"%.1f".format(telemetry.batteryV)} V",
                     fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color.White.copy(alpha = 0.7f),
                 )
                 Spacer(Modifier.height(20.dp))
                 Button(
@@ -180,7 +181,8 @@ fun HomeScreen(
                     Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = RobotOrange,
+                        containerColor = Color(0xFF2BB3A0),
+                        contentColor = Color(0xFF06201C),
                     ),
                 ) {
                     Text("Enter", fontSize = 17.sp,

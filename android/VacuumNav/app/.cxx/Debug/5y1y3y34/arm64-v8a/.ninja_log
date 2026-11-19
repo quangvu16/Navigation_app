@@ -1,11 +1,9 @@
 # ninja log v5
-39	564	1795085693282976371	/Users/quangvu/.cache/vacuum-nav/build/app/intermediates/cxx/Debug/5y1y3y34/obj/arm64-v8a/libvacuum_jni.so	daa25227c24e5864
-729	1223	1795077297370000000	vacuum_core/libvacuum_core.a	a592ce0236cb68e
-4	1594	1795078220200000000	CMakeFiles/vacuum_jni.dir/jni_bridge.cpp.o	ab09742348505fa7
-2	729	1795077296170000000	vacuum_core/CMakeFiles/vacuum_core.dir/sim/sim_robot.cpp.o	11fc11b4b349af39
-1	696	1795077296170000000	vacuum_core/CMakeFiles/vacuum_core.dir/sim/sim_world.cpp.o	7325bdb26bcec4df
 14	1294	1795088128790000000	vacuum_core/CMakeFiles/vacuum_core.dir/sim/sim_world.cpp.o	8eae21f996e857b6
 14	1388	1795088128880000000	vacuum_core/CMakeFiles/vacuum_core.dir/sim/sim_robot.cpp.o	28fc3a5b6b743e1d
 13	1450	1795088128940000000	CMakeFiles/vacuum_jni.dir/jni_bridge.cpp.o	6b16a7d2b85069d7
 1388	1521	1795088129020000000	vacuum_core/libvacuum_core.a	a592ce0236cb68e
 1521	1724	1795088129213660294	/Users/quangvu/.cache/vacuum-nav/build/app/intermediates/cxx/Debug/5y1y3y34/obj/arm64-v8a/libvacuum_jni.so	daa25227c24e5864
+3	469	1795089672296304150	/Users/quangvu/.cache/vacuum-nav/build/app/intermediates/cxx/Debug/5y1y3y34/obj/arm64-v8a/libvacuum_jni.so	daa25227c24e5864
+3	316	1795091420914658351	/Users/quangvu/.cache/vacuum-nav/build/app/intermediates/cxx/Debug/5y1y3y34/obj/arm64-v8a/libvacuum_jni.so	daa25227c24e5864
+2	379	1795091477449002878	/Users/quangvu/.cache/vacuum-nav/build/app/intermediates/cxx/Debug/5y1y3y34/obj/arm64-v8a/libvacuum_jni.so	daa25227c24e5864

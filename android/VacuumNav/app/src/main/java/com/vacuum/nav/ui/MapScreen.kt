@@ -67,6 +67,7 @@ fun MapScreen(
 
     var mode by remember { mutableIntStateOf(0) }   // 0 Full, 1 Rooms, 2 Zones
     var showGrid by remember { mutableStateOf(true) }
+    var iso by remember { mutableStateOf(true) }   // 3D isometric view
     val autoClean = RobotService.autoClean
     val eStop = RobotService.eStop
 
@@ -92,6 +93,7 @@ fun MapScreen(
         }
 
         // ---- map + right icon rail --------------------------------------
+        val lidarState by RobotService.lidarCtl.state.collectAsState()
         Box(Modifier.weight(1f).fillMaxWidth()) {
             MapCanvas(
                 config = config,
@@ -105,6 +107,15 @@ fun MapScreen(
                 ),
                 zones = zones.value,
                 showGrid = showGrid,
+                iso = iso,
+                targetPos = lidarState.target?.let {
+                    RobotService.lidarCtl.targetWorld(
+                        telemetry.pose.x.toDouble(),
+                        telemetry.pose.y.toDouble(),
+                        telemetry.pose.theta.toDouble(),
+                    )
+                },
+                warning = lidarState.warning.buzzer,
                 modifier = Modifier.fillMaxSize(),
             )
             Column(
@@ -116,6 +127,7 @@ fun MapScreen(
                 RailButton(if (showGrid) "▦" else "▢", "Grid") {
                     showGrid = !showGrid
                 }
+                RailButton("⬡", if (iso) "3D" else "2D") { iso = !iso }
             }
             if (mode == 1) ModeHint("Rooms arrive with Phase 7 segmentation")
             if (mode == 2) ModeHint("Zones: draw on the Zones tab")

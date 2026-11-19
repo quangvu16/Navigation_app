@@ -7,6 +7,8 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
@@ -14,9 +16,16 @@ import android.net.wifi.WifiManager
 import androidx.core.app.NotificationCompat
 import com.vacuum.nav.R
 import com.vacuum.nav.data.RunStats
+import com.vacuum.nav.lidar.LidarBehaviorController
+import com.vacuum.nav.lidar.LidarMode
 import com.vacuum.nav.robot.RobotConfig
 import com.vacuum.nav.robot.RobotLink
 import com.vacuum.nav.robot.SimRobotLink
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Owns the robot brain so it outlives the UI (prompt §3): a foreground
@@ -32,12 +41,17 @@ class RobotService : Service() {
     private var wifiLock: WifiManager.WifiLock? = null
     private var controlThread: Thread? = null
     private var alive = true
+    private var tone: ToneGenerator? = null
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         instance = this
+        tone = runCatching {
+            ToneGenerator(AudioManager.STREAM_MUSIC, 60)
+        }.getOrNull()
 
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "vacuum:brain").apply {
@@ -62,10 +76,18 @@ class RobotService : Service() {
             link = SimRobotLink(RobotConfig())
         }
 
-        // 20 Hz control thread: auto-clean ("bump-and-go" in the simulator -
-        // front sonar blocked -> turn, else forward) + run-stat integration.
-        // The planner replaces the bump-and-go policy in Phase 4; the rate
-        // and the safety interlocks (E-stop, deadman) stay here.
+        // Feed every scan to the lidar behaviours (avoidance/tracking/
+        // warning/following, ported from robot_ws/hoverboard_laser).
+        link?.let { l ->
+            serviceScope.launch {
+                l.scans.collect { lidarCtl.onScan(it) }
+            }
+        }
+
+        // 20 Hz control thread. Precedence: E-STOP > lidar behaviour modes
+        // (AVOID/FOLLOW) > auto-clean bump-and-go > manual joystick. EVERY
+        // path goes through the bumper polygons (collision_monitor
+        // reference) and the E-STOP gate (prompt §7).
         val cfg = RobotConfig()
         controlThread = Thread {
             while (alive) {
@@ -75,13 +97,32 @@ class RobotService : Service() {
                     RunStats.tickRunning(0.05)
                     RunStats.onPose(t.pose.x.toDouble(),
                         t.pose.y.toDouble(), cfg.brushWidthM)
-                    if (autoClean && !eStop) {
-                        val front = t.sonarFrontM
-                        if (front in 0.02..0.35) {
-                            // Blocked ahead: turn in place away from it.
-                            l.setWheelRpm(-14f, 16f)
-                        } else {
-                            l.setWheelRpm(16f, 16f)
+
+                    val cmd: Pair<Double, Double> = when {
+                        eStop -> 0.0 to 0.0
+                        lidarCtl.currentMode() != LidarMode.MANUAL ->
+                            lidarCtl.compute(System.currentTimeMillis())
+                                ?: (0.0 to 0.0)
+                        autoClean -> {
+                            // Bump-and-go (sim); front sonar blocked -> turn.
+                            val raw = if (t.sonarFrontM in 0.02..0.35)
+                                (0.0 to 0.9) else (0.16 to 0.0)
+                            lidarCtl.applyBumper(raw)
+                        }
+                        else -> lidarCtl.applyBumper(manualV to manualW)
+                    }
+                    val (wl, wr) = cfg.velocityToWheelRpm(cmd.first, cmd.second)
+                    l.setWheelRpm(wl.toFloat(), wr.toFloat())
+
+                    // Warning: phone beep on the edge + HBC2 buzzer flag
+                    // (-> ESP32 GPIO25 on the real link, /Buzzer in the
+                    // reference stack).
+                    val warnOn = lidarCtl.state.value.warning.buzzer &&
+                        lidarCtl.buzzerEnabled
+                    l.setBuzzer(warnOn)
+                    lidarCtl.buzzerEdge()?.let { on ->
+                        if (on) runCatching {
+                            tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
                         }
                     }
                 }
@@ -105,9 +146,12 @@ class RobotService : Service() {
     override fun onDestroy() {
         alive = false
         controlThread?.join(200)
+        serviceScope.cancel()
         link?.setWheelRpm(0f, 0f)  // zero on service destroy (prompt §7)
+        link?.setBuzzer(false)
         link?.close()
         link = null
+        runCatching { tone?.release() }
         wakeLock?.release()
         wifiLock?.release()
         instance = null
@@ -155,6 +199,33 @@ class RobotService : Service() {
         var eStop = false
             private set
 
+        /** Lidar behaviours (avoidance / tracking / warning / following),
+         *  ported from robot_ws/hoverboard_laser. UI reads [LidarBehaviorController.state]. */
+        val lidarCtl = LidarBehaviorController()
+
+        // Manual joystick demand in (v, w); applied through the bumper in
+        // the control thread (prompt §7: joystick never bypasses it).
+        @Volatile var manualV = 0.0
+            private set
+        @Volatile var manualW = 0.0
+            private set
+
+        fun manualDrive(v: Double, w: Double) {
+            manualV = v
+            manualW = w
+        }
+
+        fun setLidarMode(mode: LidarMode) {
+            lidarCtl.setMode(mode)
+            if (mode != LidarMode.MANUAL) {
+                // A lidar behaviour owns the wheels: cleaning yields.
+                autoClean = false
+                RunStats.stopRun()
+                manualV = 0.0
+                manualW = 0.0
+            }
+        }
+
         fun start(context: Context) {
             val intent = Intent(context, RobotService::class.java)
             if (Build.VERSION.SDK_INT >= 26) {
@@ -176,12 +247,15 @@ class RobotService : Service() {
             link?.setWheelRpm(0f, 0f)
         }
 
-        /** Joystick drag: take the wheels back from auto-clean. */
+        /** Joystick drag: take the wheels back from auto-clean AND any
+         *  lidar behaviour (reference: nodes pause while joystick active). */
         fun manualOverride() {
             if (autoClean) {
                 autoClean = false
                 RunStats.stopRun()
             }
+            if (lidarCtl.currentMode() != LidarMode.MANUAL)
+                lidarCtl.setMode(LidarMode.MANUAL)
         }
 
         fun setEstop(on: Boolean) {
