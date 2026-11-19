@@ -23,6 +23,13 @@ target_include_directories(vacuum_core PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}          # for sim/sim_world.h includes
 )
 
+# Eigen (header-only, prompt §3 architecture decision). Vendored so the
+# build works offline; ekf.h is the first consumer, the Phase-3 pose graph
+# uses its sparse modules.
+target_include_directories(vacuum_core PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/eigen-src/eigen-3.4.0
+)
+
 if(NOT ANDROID)
   target_compile_options(vacuum_core PRIVATE -Wall -Wextra)
 endif()
@@ -38,6 +45,8 @@ if(VACUUM_BUILD_TESTS AND NOT ANDROID)
     tests/test_sim_world.cpp
     tests/test_sim_robot.cpp
     tests/test_scan_transform.cpp
+    tests/test_odometry.cpp
+    tests/test_ekf.cpp
   )
   target_link_libraries(vacuum_core_tests PRIVATE vacuum_core GTest::gtest_main)
   include(GoogleTest)
