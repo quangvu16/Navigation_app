@@ -34,6 +34,12 @@
 				"file" : 0,
 				"line" : 21,
 				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 29,
+				"parent" : 0
 			}
 		]
 	},
@@ -58,6 +64,10 @@
 				{
 					"backtrace" : 2,
 					"path" : "/Volumes/0775999222/App/Navigation APP/vacuum_core"
+				},
+				{
+					"backtrace" : 3,
+					"path" : "/Volumes/0775999222/App/Navigation APP/vacuum_core/third_party/eigen-src/eigen-3.4.0"
 				}
 			],
 			"language" : "CXX",

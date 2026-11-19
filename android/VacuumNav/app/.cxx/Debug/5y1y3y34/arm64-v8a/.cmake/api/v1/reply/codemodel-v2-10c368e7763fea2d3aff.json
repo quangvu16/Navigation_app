@@ -74,14 +74,14 @@
 				{
 					"directoryIndex" : 1,
 					"id" : "vacuum_core::@b80d0981f10d3e493ecf",
-					"jsonFile" : "target-vacuum_core-Debug-f607a15e18a4d2c97920.json",
+					"jsonFile" : "target-vacuum_core-Debug-a0d5c5a845087349509e.json",
 					"name" : "vacuum_core",
 					"projectIndex" : 1
 				},
 				{
 					"directoryIndex" : 0,
 					"id" : "vacuum_jni::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-vacuum_jni-Debug-954aae7e54dbaeb26f5f.json",
+					"jsonFile" : "target-vacuum_jni-Debug-578b65267d77873ec750.json",
 					"name" : "vacuum_jni",
 					"projectIndex" : 0
 				}
@@ -91,7 +91,7 @@
 	"kind" : "codemodel",
 	"paths" : 
 	{
-		"build" : "/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/.cxx/Debug/5y1y3y34/x86_64",
+		"build" : "/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/.cxx/Debug/5y1y3y34/arm64-v8a",
 		"source" : "/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/src/main/cpp"
 	},
 	"version" : 

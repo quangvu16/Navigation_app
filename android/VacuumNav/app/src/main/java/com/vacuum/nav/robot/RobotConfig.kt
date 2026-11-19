@@ -16,6 +16,9 @@ data class RobotConfig(
     // body
     val robotRadiusM: Double = 0.23,
     val inflateSoftMarginM: Double = 0.10,
+    // Cleaning brush width: area stats = path length x brush (RunStats).
+    // Kotlin-side for now; the C++ coverage planner owns its copy in Phase 7.
+    val brushWidthM: Double = 0.25,
     // lidar mounting (raw bins are clockwise from the zero mark)
     val scanBins: Int = 360,
     val lidarMirror: Boolean = true,

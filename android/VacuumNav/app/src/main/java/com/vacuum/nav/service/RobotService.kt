@@ -13,6 +13,7 @@ import android.os.PowerManager
 import android.net.wifi.WifiManager
 import androidx.core.app.NotificationCompat
 import com.vacuum.nav.R
+import com.vacuum.nav.data.RunStats
 import com.vacuum.nav.robot.RobotConfig
 import com.vacuum.nav.robot.RobotLink
 import com.vacuum.nav.robot.SimRobotLink
@@ -29,6 +30,8 @@ class RobotService : Service() {
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
+    private var controlThread: Thread? = null
+    private var alive = true
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -58,6 +61,37 @@ class RobotService : Service() {
         if (link == null) {
             link = SimRobotLink(RobotConfig())
         }
+
+        // 20 Hz control thread: auto-clean ("bump-and-go" in the simulator -
+        // front sonar blocked -> turn, else forward) + run-stat integration.
+        // The planner replaces the bump-and-go policy in Phase 4; the rate
+        // and the safety interlocks (E-stop, deadman) stay here.
+        val cfg = RobotConfig()
+        controlThread = Thread {
+            while (alive) {
+                val l = link
+                if (l != null) {
+                    val t = l.telemetry.value
+                    RunStats.tickRunning(0.05)
+                    RunStats.onPose(t.pose.x.toDouble(),
+                        t.pose.y.toDouble(), cfg.brushWidthM)
+                    if (autoClean && !eStop) {
+                        val front = t.sonarFrontM
+                        if (front in 0.02..0.35) {
+                            // Blocked ahead: turn in place away from it.
+                            l.setWheelRpm(-14f, 16f)
+                        } else {
+                            l.setWheelRpm(16f, 16f)
+                        }
+                    }
+                }
+                try {
+                    Thread.sleep(50)
+                } catch (_: InterruptedException) {
+                    break
+                }
+            }
+        }.apply { isDaemon = true; start() }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -69,6 +103,8 @@ class RobotService : Service() {
     }
 
     override fun onDestroy() {
+        alive = false
+        controlThread?.join(200)
         link?.setWheelRpm(0f, 0f)  // zero on service destroy (prompt §7)
         link?.close()
         link = null
@@ -109,12 +145,51 @@ class RobotService : Service() {
         @Volatile
         private var instance: RobotService? = null
 
+        /** Auto-clean policy engaged (Start button); cleared by Stop or the
+         *  joystick taking over (manual override). */
+        @Volatile
+        var autoClean = false
+            private set
+
+        @Volatile
+        var eStop = false
+            private set
+
         fun start(context: Context) {
             val intent = Intent(context, RobotService::class.java)
             if (Build.VERSION.SDK_INT >= 26) {
                 context.startForegroundService(intent)
             } else {
                 context.startService(intent)
+            }
+        }
+
+        fun startCleaning() {
+            autoClean = true
+            eStop = false
+            RunStats.startRun()
+        }
+
+        fun stopCleaning() {
+            autoClean = false
+            RunStats.stopRun()
+            link?.setWheelRpm(0f, 0f)
+        }
+
+        /** Joystick drag: take the wheels back from auto-clean. */
+        fun manualOverride() {
+            if (autoClean) {
+                autoClean = false
+                RunStats.stopRun()
+            }
+        }
+
+        fun setEstop(on: Boolean) {
+            eStop = on
+            if (on) {
+                autoClean = false
+                RunStats.stopRun()
+                link?.setWheelRpm(0f, 0f)
             }
         }
     }
