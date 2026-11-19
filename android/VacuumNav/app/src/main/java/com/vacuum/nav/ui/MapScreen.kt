@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.asImageBitmap
 import com.vacuum.nav.data.RunStats
 import com.vacuum.nav.data.ZoneStore
 import com.vacuum.nav.robot.RobotConfig
@@ -94,6 +95,11 @@ fun MapScreen(
 
         // ---- map + right icon rail --------------------------------------
         val lidarState by RobotService.lidarCtl.state.collectAsState()
+        // Phase 3: occupancy layer, bitmap rebuilt only on version change.
+        val mapSnap by (RobotService.mapper?.snapshot
+            ?: remember { kotlinx.coroutines.flow.MutableStateFlow(null) })
+            .collectAsState()
+        val gridImage = remember(mapSnap) { mapSnap?.let(::buildGridImage) }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             MapCanvas(
                 config = config,
@@ -108,6 +114,7 @@ fun MapScreen(
                 zones = zones.value,
                 showGrid = showGrid,
                 iso = iso,
+                grid = gridImage,
                 targetPos = lidarState.target?.let {
                     RobotService.lidarCtl.targetWorld(
                         telemetry.pose.x.toDouble(),
@@ -185,6 +192,34 @@ fun MapScreen(
         @Suppress("UNUSED_EXPRESSION")
         tick  // read so recomposition tracks the stat clock
     }
+}
+
+/**
+ * Snapshot -> ImageBitmap: unknown transparent (dark bg shows through),
+ * free light, occupied wall-dark. Row 0 of the snapshot is the WORLD
+ * BOTTOM, so the bitmap rows are flipped here (screen row 0 = top).
+ */
+private fun buildGridImage(s: com.vacuum.nav.robot.GridSnapshot): GridImage {
+    val px = IntArray(s.width * s.height)
+    for (y in 0 until s.height) {
+        val row = s.height - 1 - y
+        for (x in 0 until s.width) {
+            px[row * s.width + x] = when (s.cells[y * s.width + x].toInt()) {
+                1 -> 0xFF4A4D52.toInt()   // occupied (theme MapWall)
+                0 -> 0xFFE8E6E1.toInt()   // free (theme MapFree)
+                else -> 0x00000000        // unknown: transparent
+            }
+        }
+    }
+    val bmp = android.graphics.Bitmap.createBitmap(
+        px, s.width, s.height, android.graphics.Bitmap.Config.ARGB_8888)
+    return GridImage(
+        image = bmp.asImageBitmap(),
+        worldX = s.originX * s.resolution.toDouble(),
+        worldY = s.originY * s.resolution.toDouble(),
+        sizeXM = s.width * s.resolution.toDouble(),
+        sizeYM = s.height * s.resolution.toDouble(),
+    )
 }
 
 @Composable

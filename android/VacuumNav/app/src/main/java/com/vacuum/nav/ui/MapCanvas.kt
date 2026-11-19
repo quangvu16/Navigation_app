@@ -30,6 +30,19 @@ import kotlin.math.sin
 private const val COS30 = 0.8660254f
 
 /**
+ * Prebuilt occupancy layer (Phase 3): the bitmap is rebuilt only when the
+ * mapper's version changes (prompt §6), never per frame. Unknown cells are
+ * transparent so the dark map background shows through.
+ */
+data class GridImage(
+    val image: androidx.compose.ui.graphics.ImageBitmap,
+    val worldX: Double,      // bottom-left of the grid, world metres
+    val worldY: Double,
+    val sizeXM: Double,
+    val sizeYM: Double,
+)
+
+/**
  * The live map. World coordinates are metres (x right, y up); screen y is
  * down, so every draw flips Y (prompt §6 - goals and overlays always travel
  * in world metres, never pixels). Pan + pinch-zoom via one transformable
@@ -50,6 +63,7 @@ fun MapCanvas(
     zones: List<NoGoZone> = emptyList(),
     showGrid: Boolean = true,
     iso: Boolean = false,
+    grid: GridImage? = null,                   // Phase 3 occupancy layer
     targetPos: Pair<Double, Double>? = null,   // tracked lidar target
     warning: Boolean = false,                  // proximity buzzer active
     onScreenTransform: ((scale: Float, pxPerM: Float) -> Unit)? = null,
@@ -74,6 +88,23 @@ fun MapCanvas(
         fun toScreen(wx: Double, wy: Double): Offset =
             if (iso) isoPoint(wx, wy, cx, cy, scale)
             else Offset(cx + (wx * scale).toFloat(), cy - (wy * scale).toFloat())
+
+        // Occupancy layer under everything (2D view; the iso projection
+        // draws the same cells per-face later if needed).
+        grid?.let { g ->
+            if (!iso) {
+                val tl = toScreen(g.worldX, g.worldY + g.sizeYM)
+                val br = toScreen(g.worldX + g.sizeXM, g.worldY)
+                val dw = (br.x - tl.x).toInt().coerceAtLeast(1)
+                val dh = (tl.y - br.y).toInt().coerceAtLeast(1)
+                drawImage(
+                    g.image,
+                    dstOffset = androidx.compose.ui.unit.IntOffset(
+                        tl.x.toInt(), tl.y.toInt()),
+                    dstSize = androidx.compose.ui.unit.IntSize(dw, dh),
+                )
+            }
+        }
 
         if (showGrid) drawGrid(::toScreen)
         drawZones(zones, ::toScreen)

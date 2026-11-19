@@ -8,6 +8,7 @@
 
 #include <jni.h>
 
+#include <cstring>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -211,6 +212,132 @@ Java_com_vacuum_nav_robot_NativeEngine_nativeGetStatus(JNIEnv* env, jobject,
     buf[5] = static_cast<float>(s.ticksR);
   }
   env->SetFloatArrayRegion(out6, 0, 6, buf);
+}
+
+}  // extern "C" (sim Engine ends; Eigen-backed mapper code must be C++)
+
+// ---------------------------------------------------------------------------
+// MapperEngine — Phase 3 live mapping. Own handle (independent of the sim
+// Engine): preprocess -> correlative match -> integrate -> keyframes/loops.
+// The Kotlin side calls feed() from the scan collector and snapshot() when
+// the version changes (prompt §6: build the bitmap only on change).
+// ---------------------------------------------------------------------------
+
+#include "vacuum/mapper.h"
+#include "vacuum/scan_matcher.h"
+
+namespace {
+
+struct MapperHolder {
+  std::mutex mutex;
+  RobotConfig cfg;
+  vacuum::ScanPreprocessor pre;
+  vacuum::Mapper mapper;
+  uint64_t version = 0;   // bumped whenever keyframes change
+
+  explicit MapperHolder(const RobotConfig& c) : cfg(c) { pre.cfg = c; }
+};
+
+MapperHolder* fromMapper(jlong h) {
+  return reinterpret_cast<MapperHolder*>(h);
+}
+
+}  // namespace
+
+extern "C" {
+
+JNIEXPORT jlong JNICALL
+Java_com_vacuum_nav_robot_MapperEngine_nativeCreate(JNIEnv* env, jobject,
+                                                    jstring configJson) {
+  const RobotConfig cfg =
+      RobotConfig::fromJson(FlatJson::parse(jstringToString(env, configJson)));
+  return reinterpret_cast<jlong>(new MapperHolder(cfg));
+}
+
+JNIEXPORT void JNICALL
+Java_com_vacuum_nav_robot_MapperEngine_nativeDestroy(JNIEnv*, jobject,
+                                                     jlong handle) {
+  delete fromMapper(handle);
+}
+
+// Feed one scan with the pose guess (map frame). Writes the matched pose
+// into outPose[3]. De-skew uses the same pose for start/end here; LDS2
+// start/end times land with the real link's deskew (Phase 3 hardware).
+JNIEXPORT void JNICALL
+Java_com_vacuum_nav_robot_MapperEngine_nativeFeed(
+    JNIEnv* env, jobject, jlong handle, jfloatArray ranges, jint bins,
+    jfloat poseX, jfloat poseY, jfloat poseTheta, jfloatArray outPose) {
+  MapperHolder* m = fromMapper(handle);
+  if (!m) return;
+  std::lock_guard<std::mutex> lock(m->mutex);
+
+  std::vector<float> r(static_cast<size_t>(bins));
+  env->GetFloatArrayRegion(ranges, 0, bins, r.data());
+
+  const Pose2D guess(poseX, poseY, poseTheta);
+  // Preprocess (range gate + voxel downsample; de-skew is a no-op when
+  // start == end pose), then match/integrate/keyframe/loop inside Mapper.
+  const auto pts = m->pre.process(r.data(), bins, guess, guess);
+  const Pose2D matched = m->mapper.process(guess, pts);
+  m->version = m->mapper.keyframes().size();
+
+  const float out[3] = {static_cast<float>(matched.x),
+                        static_cast<float>(matched.y),
+                        static_cast<float>(matched.theta)};
+  env->SetFloatArrayRegion(outPose, 0, 3, out);
+}
+
+// Monotonic map version (keyframe count): the UI rebuilds its bitmap when
+// this changes and nothing else (prompt §6).
+JNIEXPORT jint JNICALL
+Java_com_vacuum_nav_robot_MapperEngine_nativeVersion(JNIEnv*, jobject,
+                                                     jlong handle) {
+  MapperHolder* m = fromMapper(handle);
+  if (!m) return 0;
+  std::lock_guard<std::mutex> lock(m->mutex);
+  return static_cast<jint>(m->version);
+}
+
+// Occupancy snapshot: [w i32][h i32][gx0 i32][gy0 i32][res f32] + w*h
+// cells (0 free, 1 occupied, 2 unknown), row 0 = bottom of the world.
+JNIEXPORT jbyteArray JNICALL
+Java_com_vacuum_nav_robot_MapperEngine_nativeSnapshot(JNIEnv* env, jobject,
+                                                      jlong handle) {
+  MapperHolder* m = fromMapper(handle);
+  if (!m) return nullptr;
+  std::lock_guard<std::mutex> lock(m->mutex);
+
+  const auto& grid = m->mapper.map();
+  const int w = grid.width(), h = grid.height();
+  const size_t header = 20;
+  const size_t total = header + static_cast<size_t>(w) * h;
+  std::vector<uint8_t> buf(total);
+  auto putI32 = [&](size_t off, int32_t v) {
+    for (int i = 0; i < 4; ++i)
+      buf[off + i] = static_cast<uint8_t>((v >> (8 * i)) & 0xFF);
+  };
+  putI32(0, w);
+  putI32(4, h);
+  putI32(8, grid.originX());
+  putI32(12, grid.originY());
+  float res = static_cast<float>(grid.resolution());
+  std::memcpy(&buf[16], &res, 4);
+
+  for (int y = 0; y < h; ++y) {
+    for (int x = 0; x < w; ++x) {
+      const int gx = grid.originX() + x, gy = grid.originY() + y;
+      uint8_t v;   // 0 free, 1 occupied, 2 unknown
+      if (grid.occupied(gx, gy)) v = 1;
+      else if (grid.free(gx, gy)) v = 0;
+      else v = 2;
+      buf[header + static_cast<size_t>(y) * w + x] = v;
+    }
+  }
+
+  jbyteArray out = env->NewByteArray(static_cast<jsize>(total));
+  env->SetByteArrayRegion(out, 0, static_cast<jsize>(total),
+                          reinterpret_cast<const jbyte*>(buf.data()));
+  return out;
 }
 
 }  // extern "C"

@@ -18,6 +18,7 @@ import com.vacuum.nav.R
 import com.vacuum.nav.data.RunStats
 import com.vacuum.nav.lidar.LidarBehaviorController
 import com.vacuum.nav.lidar.LidarMode
+import com.vacuum.nav.robot.MapperEngine
 import com.vacuum.nav.robot.RobotConfig
 import com.vacuum.nav.robot.RobotLink
 import com.vacuum.nav.robot.SimRobotLink
@@ -76,7 +77,8 @@ class RobotService : Service() {
         if (link == null) {
             link = SimRobotLink(RobotConfig())
         }
-        watchScans()   // feeds lidarCtl from the current link's scans
+        mapper = MapperEngine(RobotConfig())   // Phase 3 live mapping
+        watchScans()   // feeds lidarCtl + mapper from the current link
 
         // 20 Hz control thread. Precedence: E-STOP > lidar behaviour modes
         // (AVOID/FOLLOW) > auto-clean bump-and-go > manual joystick. EVERY
@@ -151,7 +153,14 @@ class RobotService : Service() {
         scanJob?.cancel()
         val l = link ?: return
         scanJob = serviceScope.launch {
-            l.scans.collect { lidarCtl.onScan(it) }
+            l.scans.collect { scan ->
+                lidarCtl.onScan(scan)
+                // Phase 3: feed the mapper with the pose guess (sim truth
+                // today; EKF output once Phase 2's filter is on-device).
+                // ~10 ms of scan matching on this dispatcher, not the UI.
+                val guess = l.telemetry.value.pose
+                mapper?.feed(scan.ranges, guess)
+            }
         }
     }
 
@@ -163,6 +172,8 @@ class RobotService : Service() {
         link?.setBuzzer(false)
         link?.close()
         link = null
+        mapper?.close()
+        mapper = null
         runCatching { tone?.release() }
         wakeLock?.release()
         wifiLock?.release()
@@ -209,6 +220,11 @@ class RobotService : Service() {
 
         @Volatile
         var eStop = false
+            private set
+
+        /** Phase 3 occupancy mapper (grows while scans arrive). */
+        @Volatile
+        var mapper: MapperEngine? = null
             private set
 
         /** Lidar behaviours (avoidance / tracking / warning / following),
