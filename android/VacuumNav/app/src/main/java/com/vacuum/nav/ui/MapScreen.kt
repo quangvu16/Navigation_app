@@ -100,6 +100,12 @@ fun MapScreen(
             ?: remember { kotlinx.coroutines.flow.MutableStateFlow(null) })
             .collectAsState()
         val gridImage = remember(mapSnap) { mapSnap?.let(::buildGridImage) }
+        // Phase 4: go-to goal + planned path + state chip.
+        val navState by (RobotService.nav?.state
+            ?: remember { kotlinx.coroutines.flow.MutableStateFlow(
+                com.vacuum.nav.robot.NavUiState()) }).collectAsState()
+        var navMessage by remember { mutableStateOf<String?>(null) }
+        val ctx = androidx.compose.ui.platform.LocalContext.current
         Box(Modifier.weight(1f).fillMaxWidth()) {
             MapCanvas(
                 config = config,
@@ -123,6 +129,12 @@ fun MapScreen(
                     )
                 },
                 warning = lidarState.warning.buzzer,
+                goal = navState.goal,
+                path = navState.path,
+                onLongPress = { wx, wy ->
+                    val ok = RobotService.startGoTo(ctx, wx, wy)
+                    navMessage = if (ok) null else "Invalid goal (obstacle)"
+                },
                 modifier = Modifier.fillMaxSize(),
             )
             Column(
@@ -138,6 +150,35 @@ fun MapScreen(
             }
             if (mode == 1) ModeHint("Rooms arrive with Phase 7 segmentation")
             if (mode == 2) ModeHint("Zones: draw on the Zones tab")
+            // Phase 4: go-to status / rejection feedback.
+            val navLabel = when {
+                navMessage != null -> navMessage
+                navState.state == com.vacuum.nav.robot.NavState.REJECTED ->
+                    "Invalid goal (obstacle)"
+                navState.active ->
+                    com.vacuum.nav.robot.NavState.label(navState.state)
+                navState.state == com.vacuum.nav.robot.NavState.REACHED ->
+                    "Goal reached"
+                navState.state == com.vacuum.nav.robot.NavState.STUCK ->
+                    "Stuck — gave up"
+                else -> null
+            }
+            if (navLabel != null) {
+                ModeHint(navLabel + if (navState.active)
+                    "  ·  long-press to re-goal, joystick to cancel" else "")
+            } else if (!navState.active && navState.goal == null) {
+                ModeHint("Long-press the map to drive there")
+            }
+            // Clear one-shot messages once the state moves on.
+            LaunchedEffect(navState.state) {
+                if (navState.state == com.vacuum.nav.robot.NavState.REACHED ||
+                    navState.state == com.vacuum.nav.robot.NavState.STUCK
+                ) {
+                    delay(4000)
+                    navMessage = null
+                    RobotService.cancelGoTo()
+                }
+            }
         }
 
         // ---- mode tabs ---------------------------------------------------

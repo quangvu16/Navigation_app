@@ -18,10 +18,14 @@ import com.vacuum.nav.R
 import com.vacuum.nav.data.RunStats
 import com.vacuum.nav.lidar.LidarBehaviorController
 import com.vacuum.nav.lidar.LidarMode
+import com.vacuum.nav.data.ZoneStore
 import com.vacuum.nav.robot.MapperEngine
+import com.vacuum.nav.robot.NavEngine
+import com.vacuum.nav.robot.NavState
 import com.vacuum.nav.robot.RobotConfig
 import com.vacuum.nav.robot.RobotLink
 import com.vacuum.nav.robot.SimRobotLink
+import com.vacuum.nav.ui.ScanTransform
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -44,6 +48,7 @@ class RobotService : Service() {
     private var alive = true
     private var tone: ToneGenerator? = null
     private var scanJob: kotlinx.coroutines.Job? = null
+    private var lastNavMapVersion = -1
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -78,7 +83,8 @@ class RobotService : Service() {
             link = SimRobotLink(RobotConfig())
         }
         mapper = MapperEngine(RobotConfig())   // Phase 3 live mapping
-        watchScans()   // feeds lidarCtl + mapper from the current link
+        nav = NavEngine(RobotConfig())         // Phase 4 go-to-goal
+        watchScans()   // feeds lidarCtl + mapper + nav from the current link
 
         // 20 Hz control thread. Precedence: E-STOP > lidar behaviour modes
         // (AVOID/FOLLOW) > auto-clean bump-and-go > manual joystick. EVERY
@@ -96,6 +102,28 @@ class RobotService : Service() {
 
                     val cmd: Pair<Double, Double> = when {
                         eStop -> 0.0 to 0.0
+                        // Phase 4: go-to-goal owns the wheels until it
+                        // finishes or the joystick/lidar mode takes over.
+                        goToActive -> {
+                            val n = nav
+                            if (n == null) {
+                                goToActive = false
+                                0.0 to 0.0
+                            } else {
+                                val vw = n.step(t.pose.x, t.pose.y,
+                                    t.pose.theta)
+                                val st = n.state.value.state
+                                if (st == NavState.REACHED ||
+                                    st == NavState.STUCK ||
+                                    st == NavState.REJECTED
+                                ) {
+                                    goToActive = false
+                                    0.0 to 0.0
+                                } else {
+                                    lidarCtl.applyBumper(vw)
+                                }
+                            }
+                        }
                         lidarCtl.currentMode() != LidarMode.MANUAL ->
                             lidarCtl.compute(System.currentTimeMillis())
                                 ?: (0.0 to 0.0)
@@ -160,6 +188,36 @@ class RobotService : Service() {
                 // ~10 ms of scan matching on this dispatcher, not the UI.
                 val guess = l.telemetry.value.pose
                 mapper?.feed(scan.ranges, guess)
+
+                // Phase 4: keep the nav costmap fresh - static layer when
+                // the mapper publishes a new version, live obstacles from
+                // every scan (they decay after 2 s on the C++ side).
+                val snap = mapper?.snapshot?.value
+                if (snap != null && snap.version != lastNavMapVersion) {
+                    lastNavMapVersion = snap.version
+                    nav?.setMap(snap)
+                }
+                val n = nav
+                if (n != null) {
+                    val cfg = RobotConfig()
+                    val pts = ArrayList<Float>(256)
+                    var i = 0
+                    while (i < scan.ranges.size) {
+                        val r = scan.ranges[i].toDouble()
+                        if (r > 0.0) {
+                            val p = ScanTransform.binToWorldPoint(
+                                cfg, guess.x.toDouble(), guess.y.toDouble(),
+                                guess.theta.toDouble(), i, r)
+                            if (p != null) {
+                                pts.add(p.first.toFloat())
+                                pts.add(p.second.toFloat())
+                            }
+                        }
+                        i += 2   // every other beam: plenty for the layer
+                    }
+                    val arr = pts.toFloatArray()
+                    n.setObstacles(arr, arr.size / 2)
+                }
             }
         }
     }
@@ -174,6 +232,8 @@ class RobotService : Service() {
         link = null
         mapper?.close()
         mapper = null
+        nav?.close()
+        nav = null
         runCatching { tone?.release() }
         wakeLock?.release()
         wifiLock?.release()
@@ -227,6 +287,16 @@ class RobotService : Service() {
         var mapper: MapperEngine? = null
             private set
 
+        /** Phase 4 go-to-goal engine (A* + RPP + recovery). */
+        @Volatile
+        var nav: NavEngine? = null
+            private set
+
+        /** True while a goal is being pursued (control thread owns wheels). */
+        @Volatile
+        var goToActive = false
+            private set
+
         /** Lidar behaviours (avoidance / tracking / warning / following),
          *  ported from robot_ws/hoverboard_laser. UI reads [LidarBehaviorController.state]. */
         val lidarCtl = LidarBehaviorController()
@@ -246,12 +316,49 @@ class RobotService : Service() {
         fun setLidarMode(mode: LidarMode) {
             lidarCtl.setMode(mode)
             if (mode != LidarMode.MANUAL) {
-                // A lidar behaviour owns the wheels: cleaning yields.
+                // A lidar behaviour owns the wheels: cleaning and go-to yield.
                 autoClean = false
+                goToActive = false
+                nav?.cancel()
                 RunStats.stopRun()
                 manualV = 0.0
                 manualW = 0.0
             }
+        }
+
+        /**
+         * Phase 4: send the robot to a tapped world point. Pushes the
+         * current no-go zones into the costmap first (a goal behind a
+         * virtual wall is rejected with a clear message, prompt §7).
+         * Returns false when the goal is inside an obstacle/keepout.
+         */
+        fun startGoTo(context: Context, x: Double, y: Double): Boolean {
+            val n = nav ?: return false
+            val zones = ZoneStore.load(context)
+            val rects = FloatArray(zones.size * 4)
+            zones.forEachIndexed { i, z ->
+                rects[i * 4] = z.x.toFloat()
+                rects[i * 4 + 1] = z.y.toFloat()
+                rects[i * 4 + 2] = z.w.toFloat()
+                rects[i * 4 + 3] = z.h.toFloat()
+            }
+            n.setKeepouts(rects)
+            val ok = n.setGoal(x, y)
+            if (ok) {
+                autoClean = false
+                RunStats.stopRun()
+                manualV = 0.0
+                manualW = 0.0
+                lidarCtl.setMode(LidarMode.MANUAL)
+                goToActive = true
+            }
+            return ok
+        }
+
+        fun cancelGoTo() {
+            goToActive = false
+            nav?.cancel()
+            link?.setWheelRpm(0f, 0f)
         }
 
         fun start(context: Context) {
@@ -289,16 +396,23 @@ class RobotService : Service() {
 
         fun stopCleaning() {
             autoClean = false
+            goToActive = false
+            nav?.cancel()
             RunStats.stopRun()
             link?.setWheelRpm(0f, 0f)
         }
 
-        /** Joystick drag: take the wheels back from auto-clean AND any
-         *  lidar behaviour (reference: nodes pause while joystick active). */
+        /** Joystick drag: take the wheels back from auto-clean, go-to AND
+         *  any lidar behaviour (reference: nodes pause while joystick
+         *  active). */
         fun manualOverride() {
             if (autoClean) {
                 autoClean = false
                 RunStats.stopRun()
+            }
+            if (goToActive) {
+                goToActive = false
+                nav?.cancel()
             }
             if (lidarCtl.currentMode() != LidarMode.MANUAL)
                 lidarCtl.setMode(LidarMode.MANUAL)
@@ -308,6 +422,8 @@ class RobotService : Service() {
             eStop = on
             if (on) {
                 autoClean = false
+                goToActive = false
+                nav?.cancel()
                 RunStats.stopRun()
                 link?.setWheelRpm(0f, 0f)
             }

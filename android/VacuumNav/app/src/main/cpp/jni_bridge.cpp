@@ -340,4 +340,214 @@ Java_com_vacuum_nav_robot_MapperEngine_nativeSnapshot(JNIEnv* env, jobject,
   return out;
 }
 
+}  // extern "C" (mapper ends; Eigen-backed nav code must be C++)
+
+// ---------------------------------------------------------------------------
+// NavEngine - Phase 4 go-to-goal: layered costmap (static from the mapper's
+// snapshot + keepout zones + decaying scan obstacles) + GoToController
+// (A* / RPP / recovery). One handle; Kotlin drives it at 20 Hz from the
+// service control thread.
+// ---------------------------------------------------------------------------
+
+#include "vacuum/costmap.h"
+#include "vacuum/goto_controller.h"
+
+namespace {
+
+struct NavHolder {
+  std::mutex mutex;
+  RobotConfig cfg;
+  vacuum::Costmap cm;
+  vacuum::GoToController gc;
+  bool hasMap = false;
+  long nowMs = 0;           // virtual clock driven by step() (50 ms ticks)
+  double obstClockS = 0.0;  // seconds, for the2 s obstacle decay
+
+  // Parse the GridSnapshot format (same as nativeSnapshot) into a fresh
+  // OccupancyGrid and install it as the costmap's static layer.
+  bool setMap(const uint8_t* d, size_t n) {
+    if (n < 20) return false;
+    auto i32 = [&](size_t off) {
+      return static_cast<int32_t>(
+          static_cast<uint32_t>(d[off]) |
+          (static_cast<uint32_t>(d[off + 1]) << 8) |
+          (static_cast<uint32_t>(d[off + 2]) << 16) |
+          (static_cast<uint32_t>(d[off + 3]) << 24));
+    };
+    const int w = i32(0), h = i32(4), gx0 = i32(8), gy0 = i32(12);
+    float res;
+    std::memcpy(&res, d + 16, 4);
+    if (w <= 0 || h <= 0 || res <= 0 || n < 20 + static_cast<size_t>(w) * h)
+      return false;
+    vacuum::OccupancyGrid grid(res);
+    // Grow the grid to cover (gx0, gy0, w, h) by writing the corners first.
+    grid.setLogOdds(gx0, gy0, -1.0f);
+    grid.setLogOdds(gx0 + w - 1, gy0 + h - 1, -1.0f);
+    for (int y = 0; y < h; ++y)
+      for (int x = 0; x < w; ++x) {
+        const uint8_t c = d[20 + static_cast<size_t>(y) * w + x];
+        // 0 free, 1 occupied, 2 unknown.
+        grid.setLogOdds(gx0 + x, gy0 + y,
+                        c == 1 ? vacuum::OccupancyGrid::kLOddMax
+                               : c == 0 ? -1.0f : 0.0f);
+      }
+    cm.setStatic(grid);
+    hasMap = true;
+    return true;
+  }
+};
+
+NavHolder* fromNav(jlong h) { return reinterpret_cast<NavHolder*>(h); }
+
+int stateCode(vacuum::GoToState s) {
+  using G = vacuum::GoToState;
+  switch (s) {
+    case G::IDLE: return 0;
+    case G::REJECTED: return 1;
+    case G::PLANNING: return 2;
+    case G::FOLLOWING: return 3;
+    case G::RECOVERING: return 4;
+    case G::REACHED: return 5;
+    case G::STUCK: return 6;
+  }
+  return 0;
+}
+
+}  // namespace
+
+extern "C" {
+
+JNIEXPORT jlong JNICALL
+Java_com_vacuum_nav_robot_NavEngine_nativeCreate(JNIEnv* env, jobject,
+                                                 jstring configJson) {
+  const RobotConfig cfg =
+      RobotConfig::fromJson(FlatJson::parse(jstringToString(env, configJson)));
+  // Not aggregate-init: the first member is a mutex, {cfg} would try to
+  // construct it from the config.
+  NavHolder* n = new NavHolder();
+  n->cfg = cfg;
+  return reinterpret_cast<jlong>(n);
+}
+
+JNIEXPORT void JNICALL
+Java_com_vacuum_nav_robot_NavEngine_nativeDestroy(JNIEnv*, jobject,
+                                                  jlong handle) {
+  delete fromNav(handle);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_vacuum_nav_robot_NavEngine_nativeSetMap(JNIEnv* env, jobject,
+                                                 jlong handle,
+                                                 jbyteArray snapshot) {
+  NavHolder* n = fromNav(handle);
+  if (!n || !snapshot) return JNI_FALSE;
+  const jsize len = env->GetArrayLength(snapshot);
+  std::vector<uint8_t> buf(static_cast<size_t>(len));
+  env->GetByteArrayRegion(snapshot, 0, len,
+                          reinterpret_cast<jbyte*>(buf.data()));
+  std::lock_guard<std::mutex> lock(n->mutex);
+  return n->setMap(buf.data(), buf.size()) ? JNI_TRUE : JNI_FALSE;
+}
+
+// rects: [x, y, w, h] quads in world metres (NoGoZone / virtual walls).
+JNIEXPORT void JNICALL
+Java_com_vacuum_nav_robot_NavEngine_nativeSetKeepouts(JNIEnv* env, jobject,
+                                                      jlong handle,
+                                                      jfloatArray rects) {
+  NavHolder* n = fromNav(handle);
+  if (!n || !rects) return;
+  const jsize len = env->GetArrayLength(rects);
+  std::vector<float> r(static_cast<size_t>(len));
+  env->GetFloatArrayRegion(rects, 0, len, r.data());
+  std::lock_guard<std::mutex> lock(n->mutex);
+  n->cm.clearKeepouts();
+  for (jsize i = 0; i + 3 < len; i += 4) {
+    const double x = r[i], y = r[i + 1], w = r[i + 2], h = r[i + 3];
+    n->cm.addKeepout({{x, y}, {x + w, y}, {x + w, y + h}, {x, y + h}});
+  }
+}
+
+// xy: flat world points from the latest scan (Kotlin applies the lidar
+// transform); they go into the decaying live-obstacle layer.
+JNIEXPORT void JNICALL
+Java_com_vacuum_nav_robot_NavEngine_nativeSetObstacles(JNIEnv* env, jobject,
+                                                       jlong handle,
+                                                       jfloatArray xy,
+                                                       jint count) {
+  NavHolder* n = fromNav(handle);
+  if (!n || !xy) return;
+  std::vector<float> pts(static_cast<size_t>(count) * 2);
+  env->GetFloatArrayRegion(xy, 0, count * 2, pts.data());
+  std::lock_guard<std::mutex> lock(n->mutex);
+  std::vector<vacuum::Vec2> world;
+  world.reserve(static_cast<size_t>(count));
+  for (jint i = 0; i < count; ++i)
+    world.push_back({pts[i * 2], pts[i * 2 + 1]});
+  n->cm.setObstacles(world, n->obstClockS);
+}
+
+// 0 = accepted, 1 = rejected (goal in lethal - the UI shows a clear
+// message, prompt §7).
+JNIEXPORT jint JNICALL
+Java_com_vacuum_nav_robot_NavEngine_nativeSetGoal(JNIEnv*, jobject,
+                                                  jlong handle, jfloat x,
+                                                  jfloat y) {
+  NavHolder* n = fromNav(handle);
+  if (!n) return 1;
+  std::lock_guard<std::mutex> lock(n->mutex);
+  if (!n->hasMap) return 1;
+  return n->gc.setGoal(n->cm, x, y) ? 0 : 1;
+}
+
+JNIEXPORT void JNICALL
+Java_com_vacuum_nav_robot_NavEngine_nativeCancel(JNIEnv*, jobject,
+                                                 jlong handle) {
+  NavHolder* n = fromNav(handle);
+  if (!n) return;
+  std::lock_guard<std::mutex> lock(n->mutex);
+  n->gc.cancel();
+}
+
+// One control tick: advances the virtual clock, expires stale obstacles,
+// steps the state machine. Returns [v, w, stateCode].
+JNIEXPORT jfloatArray JNICALL
+Java_com_vacuum_nav_robot_NavEngine_nativeStep(JNIEnv* env, jobject,
+                                               jlong handle, jfloat px,
+                                               jfloat py, jfloat pth) {
+  NavHolder* n = fromNav(handle);
+  jfloat out[3] = {0.f, 0.f, 0.f};
+  if (n) {
+    std::lock_guard<std::mutex> lock(n->mutex);
+    n->nowMs += 50;
+    n->obstClockS += 0.05;
+    n->cm.expire(n->obstClockS);   // live obstacles fade after2 s
+    const auto cmd = n->gc.step(n->cm, vacuum::Pose2D(px, py, pth), n->nowMs);
+    out[0] = static_cast<jfloat>(cmd.v);
+    out[1] = static_cast<jfloat>(cmd.w);
+    out[2] = static_cast<jfloat>(stateCode(cmd.state));
+  }
+  jfloatArray arr = env->NewFloatArray(3);
+  env->SetFloatArrayRegion(arr, 0, 3, out);
+  return arr;
+}
+
+// Flattened path [x0, y0, x1, y1, ...] for the map overlay.
+JNIEXPORT jfloatArray JNICALL
+Java_com_vacuum_nav_robot_NavEngine_nativePath(JNIEnv* env, jobject,
+                                               jlong handle) {
+  NavHolder* n = fromNav(handle);
+  if (!n) return env->NewFloatArray(0);
+  std::lock_guard<std::mutex> lock(n->mutex);
+  const auto& p = n->gc.path();
+  std::vector<jfloat> flat(p.size() * 2);
+  for (size_t i = 0; i < p.size(); ++i) {
+    flat[i * 2] = static_cast<jfloat>(p[i].x);
+    flat[i * 2 + 1] = static_cast<jfloat>(p[i].y);
+  }
+  jfloatArray arr = env->NewFloatArray(static_cast<jsize>(flat.size()));
+  env->SetFloatArrayRegion(arr, 0, static_cast<jsize>(flat.size()),
+                           flat.data());
+  return arr;
+}
+
 }  // extern "C"

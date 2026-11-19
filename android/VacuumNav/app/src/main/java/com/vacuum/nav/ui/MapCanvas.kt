@@ -2,8 +2,10 @@ package com.vacuum.nav.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -66,6 +68,9 @@ fun MapCanvas(
     grid: GridImage? = null,                   // Phase 3 occupancy layer
     targetPos: Pair<Double, Double>? = null,   // tracked lidar target
     warning: Boolean = false,                  // proximity buzzer active
+    goal: Pair<Double, Double>? = null,        // Phase 4 go-to goal
+    path: FloatArray = FloatArray(0),          // planned path (x,y pairs)
+    onLongPress: ((Double, Double) -> Unit)? = null,   // world metres
     onScreenTransform: ((scale: Float, pxPerM: Float) -> Unit)? = null,
 ) {
     var scale by remember { mutableFloatStateOf(90f) }     // px per metre
@@ -80,7 +85,17 @@ fun MapCanvas(
     Canvas(
         modifier = modifier
             .background(MapUnknown)
-            .transformable(state = transformState),
+            .transformable(state = transformState)
+            .pointerInput(Unit) {
+                // Long-press sets a go-to goal (Phase 4). Screen -> world
+                // with the SAME transform the drawer uses (y flip included).
+                detectTapGestures(onLongPress = { p ->
+                    val cx = size.width / 2f + offset.x
+                    val cy = size.height / 2f + offset.y
+                    onLongPress?.invoke((p.x - cx) / scale.toDouble(),
+                        (cy - p.y) / scale.toDouble())
+                })
+            },
     ) {
         val cx = size.width / 2f + offset.x
         val cy = size.height / 2f + offset.y
@@ -123,6 +138,29 @@ fun MapCanvas(
         }
 
         drawSonar(config, sonar, robotX, robotY, robotTheta, ::toScreen)
+
+        // ---- Phase 4: planned path + goal marker ------------------------
+        if (path.size >= 4) {
+            val pathStroke = Color.White.copy(alpha = 0.75f)
+            for (i in 2 until path.size step 2) {
+                drawLine(
+                    color = pathStroke,
+                    start = toScreen(path[i - 2].toDouble(), path[i - 1].toDouble()),
+                    end = toScreen(path[i].toDouble(), path[i + 1].toDouble()),
+                    strokeWidth = 4f,
+                )
+            }
+        }
+        goal?.let { (gx, gy) ->
+            val gp = toScreen(gx, gy)
+            drawCircle(color = RobotOrange, radius = 12f, center = gp)
+            drawCircle(color = Color.White, radius = 12f, center = gp,
+                style = Stroke(width = 3f))
+            drawLine(color = RobotOrange, start = Offset(gp.x - 18f, gp.y),
+                end = Offset(gp.x + 18f, gp.y), strokeWidth = 3f)
+            drawLine(color = RobotOrange, start = Offset(gp.x, gp.y - 18f),
+                end = Offset(gp.x, gp.y + 18f), strokeWidth = 3f)
+        }
 
         // ---- lidar behaviour overlays -----------------------------------
         // Tracked target (laser_Tracker selection): green marker + line of
