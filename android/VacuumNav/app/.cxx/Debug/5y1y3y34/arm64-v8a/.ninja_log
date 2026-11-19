@@ -1,0 +1,6 @@
+# ninja log v5
+1	696	1795077296170000000	vacuum_core/CMakeFiles/vacuum_core.dir/sim/sim_world.cpp.o	7325bdb26bcec4df
+2	729	1795077296170000000	vacuum_core/CMakeFiles/vacuum_core.dir/sim/sim_robot.cpp.o	11fc11b4b349af39
+1	775	1795077296170000000	CMakeFiles/vacuum_jni.dir/jni_bridge.cpp.o	ab09742348505fa7
+729	1223	1795077297370000000	vacuum_core/libvacuum_core.a	a592ce0236cb68e
+1223	1294	1795077297427623612	/Users/quangvu/.cache/vacuum-nav/build/app/intermediates/cxx/Debug/5y1y3y34/obj/arm64-v8a/libvacuum_jni.so	daa25227c24e5864

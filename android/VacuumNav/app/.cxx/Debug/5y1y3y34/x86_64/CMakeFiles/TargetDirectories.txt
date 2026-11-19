@@ -1,0 +1,6 @@
+/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/.cxx/Debug/5y1y3y34/x86_64/CMakeFiles/vacuum_jni.dir
+/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/.cxx/Debug/5y1y3y34/x86_64/CMakeFiles/edit_cache.dir
+/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/.cxx/Debug/5y1y3y34/x86_64/CMakeFiles/rebuild_cache.dir
+/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/.cxx/Debug/5y1y3y34/x86_64/vacuum_core/CMakeFiles/vacuum_core.dir
+/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/.cxx/Debug/5y1y3y34/x86_64/vacuum_core/CMakeFiles/edit_cache.dir
+/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/.cxx/Debug/5y1y3y34/x86_64/vacuum_core/CMakeFiles/rebuild_cache.dir

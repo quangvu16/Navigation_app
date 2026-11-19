@@ -1,0 +1,21 @@
+# Build outputs
+build/
+vacuum_core/build/
+*.apk
+*.aab
+
+# Gradle (the wrapper jar IS committed; caches are not)
+.gradle/
+local.properties
+
+# Downloaded toolchains (CMake, Googletest source archive, Gradle dist)
+.toolchain/
+
+# macOS / exFAT artifacts
+.DS_Store
+._*
+
+# Editors
+.idea/
+*.iml
+.vscode/

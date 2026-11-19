@@ -1,0 +1,34 @@
+{
+  "buildFiles": [
+    "/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/src/main/cpp/CMakeLists.txt",
+    "/Volumes/0775999222/App/Navigation APP/vacuum_core/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/Users/quangvu/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/.cxx/Debug/5y1y3y34/x86_64",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/Users/quangvu/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/.cxx/Debug/5y1y3y34/x86_64",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "vacuum_core::@b80d0981f10d3e493ecf": {
+      "artifactName": "vacuum_core",
+      "abi": "x86_64",
+      "output": "/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/.cxx/Debug/5y1y3y34/x86_64/vacuum_core/libvacuum_core.a",
+      "runtimeFiles": []
+    },
+    "vacuum_jni::@6890427a1f51a3e7e1df": {
+      "artifactName": "vacuum_jni",
+      "abi": "x86_64",
+      "output": "/Users/quangvu/.cache/vacuum-nav/build/app/intermediates/cxx/Debug/5y1y3y34/obj/x86_64/libvacuum_jni.so",
+      "runtimeFiles": []
+    }
+  }
+}

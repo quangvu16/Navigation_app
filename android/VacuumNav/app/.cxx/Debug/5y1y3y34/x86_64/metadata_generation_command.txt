@@ -1,0 +1,20 @@
+                        -H/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/src/main/cpp
+-DCMAKE_SYSTEM_NAME=Android
+-DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+-DCMAKE_SYSTEM_VERSION=26
+-DANDROID_PLATFORM=android-26
+-DANDROID_ABI=x86_64
+-DCMAKE_ANDROID_ARCH_ABI=x86_64
+-DANDROID_NDK=/Users/quangvu/Library/Android/sdk/ndk/28.2.13676358
+-DCMAKE_ANDROID_NDK=/Users/quangvu/Library/Android/sdk/ndk/28.2.13676358
+-DCMAKE_TOOLCHAIN_FILE=/Users/quangvu/Library/Android/sdk/ndk/28.2.13676358/build/cmake/android.toolchain.cmake
+-DCMAKE_MAKE_PROGRAM=/Users/quangvu/Library/Android/sdk/cmake/3.22.1/bin/ninja
+-DCMAKE_CXX_FLAGS=-std=c++17
+-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=/Users/quangvu/.cache/vacuum-nav/build/app/intermediates/cxx/Debug/5y1y3y34/obj/x86_64
+-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=/Users/quangvu/.cache/vacuum-nav/build/app/intermediates/cxx/Debug/5y1y3y34/obj/x86_64
+-DCMAKE_BUILD_TYPE=Debug
+-B/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/.cxx/Debug/5y1y3y34/x86_64
+-GNinja
+-DVACUUM_BUILD_TESTS=OFF
+                        Build command args: []
+                        Version: 2

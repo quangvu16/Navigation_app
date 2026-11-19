@@ -1,0 +1,2 @@
+/Volumes/0775999222/App/Navigation APP/android/VacuumNav/app/src/main/cpp/CMakeLists.txt
+/Volumes/0775999222/App/Navigation APP/vacuum_core/CMakeLists.txt

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VacuumNav</string>
+    <string name="notif_channel_robot">Robot brain</string>
+    <string name="notif_running">Robot brain running</string>
+</resources>
