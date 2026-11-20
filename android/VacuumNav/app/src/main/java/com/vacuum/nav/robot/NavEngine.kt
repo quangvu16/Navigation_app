@@ -151,6 +151,64 @@ class NavEngine(private val config: RobotConfig) : AutoCloseable {
     private external fun nativeExploreGoal(handle: Long, px: Float,
                                            py: Float): FloatArray?
 
+    // ---------------- Phase 7: room segmentation --------------------------
+    data class RoomInfo(val id: Int, val areaM2: Float,
+                        val cx: Float, val cy: Float)
+
+    data class SegmentResult(
+        val width: Int, val height: Int,
+        val originX: Int, val originY: Int,
+        val resolution: Float,
+        val rooms: List<RoomInfo>,
+        val labels: ByteArray,   // row 0 = world bottom; 0 = not a room
+    )
+
+    /** Segment the current map (cached in C++ until the map changes). */
+    fun segment(): SegmentResult? {
+        if (handle == 0L) return null
+        val raw = nativeSegment(handle) ?: return null
+        if (raw.size < 21) return null
+        fun i32(off: Int): Int =
+            (raw[off].toInt() and 0xFF) or
+                ((raw[off + 1].toInt() and 0xFF) shl 8) or
+                ((raw[off + 2].toInt() and 0xFF) shl 16) or
+                ((raw[off + 3].toInt() and 0xFF) shl 24)
+        val w = i32(0); val h = i32(4)
+        val gx0 = i32(8); val gy0 = i32(12)
+        val resBits = (raw[16].toInt() and 0xFF) or
+            ((raw[17].toInt() and 0xFF) shl 8) or
+            ((raw[18].toInt() and 0xFF) shl 16) or
+            ((raw[19].toInt() and 0xFF) shl 24)
+        val res = Float.fromBits(resBits)
+        val nRooms = raw[20].toInt() and 0xFF
+        var o = 21
+        val rooms = ArrayList<RoomInfo>(nRooms)
+        repeat(nRooms) {
+            val id = raw[o].toInt() and 0xFF
+            val area = Float.fromBits(
+                (raw[o + 1].toInt() and 0xFF) or
+                    ((raw[o + 2].toInt() and 0xFF) shl 8) or
+                    ((raw[o + 3].toInt() and 0xFF) shl 16) or
+                    ((raw[o + 4].toInt() and 0xFF) shl 24))
+            val cx = Float.fromBits(
+                (raw[o + 5].toInt() and 0xFF) or
+                    ((raw[o + 6].toInt() and 0xFF) shl 8) or
+                    ((raw[o + 7].toInt() and 0xFF) shl 16) or
+                    ((raw[o + 8].toInt() and 0xFF) shl 24))
+            val cy = Float.fromBits(
+                (raw[o + 9].toInt() and 0xFF) or
+                    ((raw[o + 10].toInt() and 0xFF) shl 8) or
+                    ((raw[o + 11].toInt() and 0xFF) shl 16) or
+                    ((raw[o + 12].toInt() and 0xFF) shl 24))
+            rooms.add(RoomInfo(id, area, cx, cy))
+            o += 13
+        }
+        val labels = raw.copyOfRange(o, o + w * h)
+        return SegmentResult(w, h, gx0, gy0, res, rooms, labels)
+    }
+
+    private external fun nativeSegment(handle: Long): ByteArray?
+
     private external fun nativeCreate(configJson: String): Long
     private external fun nativeDestroy(handle: Long)
     private external fun nativeSetMap(handle: Long, snapshot: ByteArray): Boolean

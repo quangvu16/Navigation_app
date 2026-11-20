@@ -1,8 +1,8 @@
 # ninja log v5
-14	1294	1795088128790000000	vacuum_core/CMakeFiles/vacuum_core.dir/sim/sim_world.cpp.o	8eae21f996e857b6
-14	1388	1795088128880000000	vacuum_core/CMakeFiles/vacuum_core.dir/sim/sim_robot.cpp.o	28fc3a5b6b743e1d
-45	7248	1795128713790000000	CMakeFiles/vacuum_jni.dir/jni_bridge.cpp.o	6b16a7d2b85069d7
-1388	1521	1795088129020000000	vacuum_core/libvacuum_core.a	a592ce0236cb68e
-7687	7948	1795128721459998256	/Users/quangvu/.cache/vacuum-nav/build/app/intermediates/cxx/Debug/5y1y3y34/obj/arm64-v8a/libvacuum_jni.so	daa25227c24e5864
-5	4452	1795129539600000000	CMakeFiles/vacuum_jni.dir/jni_bridge.cpp.o	6b16a7d2b85069d7
 4454	4621	1795129539754515046	/Users/quangvu/.cache/vacuum-nav/build/app/intermediates/cxx/Debug/5y1y3y34/obj/arm64-v8a/libvacuum_jni.so	daa25227c24e5864
+1388	1521	1795088129020000000	vacuum_core/libvacuum_core.a	a592ce0236cb68e
+5	4452	1795129539600000000	CMakeFiles/vacuum_jni.dir/jni_bridge.cpp.o	6b16a7d2b85069d7
+14	1388	1795088128880000000	vacuum_core/CMakeFiles/vacuum_core.dir/sim/sim_robot.cpp.o	28fc3a5b6b743e1d
+14	1294	1795088128790000000	vacuum_core/CMakeFiles/vacuum_core.dir/sim/sim_world.cpp.o	8eae21f996e857b6
+7	4591	1795134941590000000	CMakeFiles/vacuum_jni.dir/jni_bridge.cpp.o	6b16a7d2b85069d7
+4594	4787	1795134941777946756	/Users/quangvu/.cache/vacuum-nav/build/app/intermediates/cxx/Debug/5y1y3y34/obj/arm64-v8a/libvacuum_jni.so	daa25227c24e5864

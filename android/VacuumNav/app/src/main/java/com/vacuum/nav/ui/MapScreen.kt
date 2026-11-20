@@ -106,6 +106,17 @@ fun MapScreen(
                 com.vacuum.nav.robot.NavUiState()) }).collectAsState()
         var navMessage by remember { mutableStateOf<String?>(null) }
         val ctx = androidx.compose.ui.platform.LocalContext.current
+        // Phase 7: Rooms tab runs segmentation (cached in C++) and tints
+        // the room cells over the occupancy layer.
+        val segResult = remember(mapSnap?.version, mode) {
+            if (mode == 1) RobotService.nav?.segment() else null
+        }
+        val roomsImage = remember(mapSnap?.version, mode) {
+            val snap = mapSnap
+            if (mode == 1 && snap != null)
+                RobotService.nav?.segment()?.let { buildRoomsImage(snap, it) }
+            else null
+        }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             MapCanvas(
                 config = config,
@@ -120,7 +131,7 @@ fun MapScreen(
                 zones = zones.value,
                 showGrid = showGrid,
                 iso = iso,
-                grid = gridImage,
+                grid = roomsImage ?: gridImage,
                 targetPos = lidarState.target?.let {
                     RobotService.lidarCtl.targetWorld(
                         telemetry.pose.x.toDouble(),
@@ -152,7 +163,14 @@ fun MapScreen(
                 }
                 RailButton("⬡", if (iso) "3D" else "2D") { iso = !iso }
             }
-            if (mode == 1) ModeHint("Rooms arrive with Phase 7 segmentation")
+            if (mode == 1) {
+                val n = segResult?.rooms?.size ?: 0
+                ModeHint(
+                    if (n > 0) "$n room${if (n == 1) "" else "s"} segmented" +
+                        " · rename/merge UI in polish"
+                    else "No rooms yet — map more of the space first",
+                )
+            }
             if (mode == 2) ModeHint("Zones: draw on the Zones tab")
             // Phase 4: go-to status / rejection feedback.
             val navLabel = when {
@@ -266,6 +284,53 @@ private fun buildGridImage(s: com.vacuum.nav.robot.GridSnapshot): GridImage {
         worldY = s.originY * s.resolution.toDouble(),
         sizeXM = s.width * s.resolution.toDouble(),
         sizeYM = s.height * s.resolution.toDouble(),
+    )
+}
+
+/**
+ * Occupancy walls + room tints in one bitmap (Phase 7): room cells get a
+ * stable hue per id (id*67 deg on the wheel), walls keep the dark wall
+ * colour, unknown stays transparent. Row 0 = world bottom (flipped here).
+ */
+private fun buildRoomsImage(
+    snap: com.vacuum.nav.robot.GridSnapshot,
+    seg: com.vacuum.nav.robot.NavEngine.SegmentResult,
+): GridImage {
+    val px = IntArray(snap.width * snap.height)
+    // Occupancy first (walls visible under/between rooms).
+    for (y in 0 until snap.height) {
+        val row = snap.height - 1 - y
+        for (x in 0 until snap.width) {
+            px[row * snap.width + x] = when (snap.cells[y * snap.width + x].toInt()) {
+                1 -> 0xFF4A4D52.toInt()
+                0 -> 0xFFE8E6E1.toInt()
+                else -> 0x00000000
+            }
+        }
+    }
+    // Overlay room colours (same flip).
+    if (seg.labels.size == snap.width * snap.height) {
+        for (y in 0 until snap.height) {
+            val row = snap.height - 1 - y
+            for (x in 0 until snap.width) {
+                val id = seg.labels[y * snap.width + x].toInt() and 0xFF
+                if (id > 0) {
+                    val hue = ((id * 67) % 360).toFloat()
+                    px[row * snap.width + x] =
+                        android.graphics.Color.HSVToColor(
+                            170, floatArrayOf(hue, 0.55f, 0.95f))
+                }
+            }
+        }
+    }
+    val bmp = android.graphics.Bitmap.createBitmap(
+        px, snap.width, snap.height, android.graphics.Bitmap.Config.ARGB_8888)
+    return GridImage(
+        image = bmp.asImageBitmap(),
+        worldX = snap.originX * snap.resolution.toDouble(),
+        worldY = snap.originY * snap.resolution.toDouble(),
+        sizeXM = snap.width * snap.resolution.toDouble(),
+        sizeYM = snap.height * snap.resolution.toDouble(),
     )
 }
 

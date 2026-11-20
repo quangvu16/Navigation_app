@@ -352,18 +352,23 @@ Java_com_vacuum_nav_robot_MapperEngine_nativeSnapshot(JNIEnv* env, jobject,
 #include "vacuum/costmap.h"
 #include "vacuum/frontier.h"
 #include "vacuum/goto_controller.h"
+#include "vacuum/segmenter.h"
 
 namespace {
 
 struct NavHolder {
   std::mutex mutex;
   RobotConfig cfg;
-  vacuum::OccupancyGrid grid;   // retained for frontier queries (Phase 6)
+  vacuum::OccupancyGrid grid;   // retained for frontier/segment queries
   vacuum::Costmap cm;
   vacuum::GoToController gc;
   bool hasMap = false;
   long nowMs = 0;           // virtual clock driven by step() (50 ms ticks)
   double obstClockS = 0.0;  // seconds, for the2 s obstacle decay
+  // Phase 7: cached segmentation (invalidated by setMap).
+  std::vector<int16_t> segLabels;
+  std::vector<vacuum::Room> segRooms;
+  bool segValid = false;
 
   // Parse the GridSnapshot format (same as nativeSnapshot) into a fresh
   // OccupancyGrid and install it as the costmap's static layer.
@@ -393,9 +398,10 @@ struct NavHolder {
                          c == 1 ? vacuum::OccupancyGrid::kLOddMax
                                 : c == 0 ? -1.0f : 0.0f);
       }
-    grid = fresh;   // keep for frontier exploration (Phase 6)
+    grid = fresh;   // keep for frontier/segment queries (Phases 6-7)
     cm.setStatic(fresh);
     hasMap = true;
+    segValid = false;   // resegment on next request
     return true;
   }
 };
@@ -571,6 +577,61 @@ Java_com_vacuum_nav_robot_NavEngine_nativeExploreGoal(JNIEnv* env, jobject,
   jfloatArray arr = env->NewFloatArray(2);
   env->SetFloatArrayRegion(arr, 0, 2, out);
   return arr;
+}
+
+// Phase 7: room segmentation of the current map. One packed ByteArray:
+// [w i32][h i32][gx0 i32][gy0 i32][res f32]
+// [nRooms u8][per room: id u8, areaM2 f32, cx f32, cy f32]
+// [labels u8 x (w*h)]   (0 = not a room)
+// Cached until the map changes (setMap invalidates).
+JNIEXPORT jbyteArray JNICALL
+Java_com_vacuum_nav_robot_NavEngine_nativeSegment(JNIEnv* env, jobject,
+                                                  jlong handle) {
+  NavHolder* n = fromNav(handle);
+  if (!n) return nullptr;
+  std::lock_guard<std::mutex> lock(n->mutex);
+  if (!n->hasMap) return nullptr;
+  if (!n->segValid) {
+    vacuum::RoomSegmenter seg;
+    n->segRooms = seg.segment(n->grid, n->segLabels);
+    n->segValid = true;
+  }
+
+  const int w = n->grid.width(), h = n->grid.height();
+  const size_t header = 20;
+  const size_t roomsBytes = 1 + n->segRooms.size() * 13;
+  const size_t total = header + roomsBytes +
+      static_cast<size_t>(w) * h;
+  std::vector<uint8_t> buf(total);
+  auto putI32 = [&](size_t off, int32_t v) {
+    for (int i = 0; i < 4; ++i)
+      buf[off + i] = static_cast<uint8_t>((v >> (8 * i)) & 0xFF);
+  };
+  auto putF32 = [&](size_t off, float f) {
+    int32_t v;
+    std::memcpy(&v, &f, 4);
+    putI32(off, v);
+  };
+  putI32(0, w);
+  putI32(4, h);
+  putI32(8, n->grid.originX());
+  putI32(12, n->grid.originY());
+  putF32(16, static_cast<float>(n->grid.resolution()));
+  buf[header] = static_cast<uint8_t>(n->segRooms.size());
+  size_t o = header + 1;
+  for (const auto& r : n->segRooms) {
+    buf[o++] = static_cast<uint8_t>(r.id);
+    putF32(o, static_cast<float>(r.areaM2)); o += 4;
+    putF32(o, static_cast<float>(r.centroid.x)); o += 4;
+    putF32(o, static_cast<float>(r.centroid.y)); o += 4;
+  }
+  for (size_t i = 0; i < n->segLabels.size(); ++i)
+    buf[o + i] = static_cast<uint8_t>(std::max<int16_t>(0, n->segLabels[i]));
+
+  jbyteArray out = env->NewByteArray(static_cast<jsize>(total));
+  env->SetByteArrayRegion(out, 0, static_cast<jsize>(total),
+                          reinterpret_cast<const jbyte*>(buf.data()));
+  return out;
 }
 
 }  // extern "C"
