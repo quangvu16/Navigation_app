@@ -1,5 +1,7 @@
 package com.vacuum.nav.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -34,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vacuum.nav.data.MapMeta
+import com.vacuum.nav.data.MapExport
 import com.vacuum.nav.data.MapStore
 import com.vacuum.nav.service.RobotService
 import java.text.SimpleDateFormat
@@ -56,6 +59,21 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     var newName by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
     val fmt = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }
+
+    // SAF picker for map JSON import (no storage permission needed).
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            val meta = MapExport.import(ctx, uri)
+            if (meta != null) {
+                maps.add(meta)
+                status = "Imported ${meta.name}"
+            } else {
+                status = "Import failed — not a VacuumNav map file"
+            }
+        }
+    }
 
     Scaffold(
         modifier = modifier,
@@ -84,6 +102,10 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             ) {
                 TextButton(onClick = onBack) { Text("‹ Back") }
                 Text("Maps", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = {
+                    importLauncher.launch(arrayOf("application/json", "*/*"))
+                }) { Text("Import", fontSize = 14.sp) }
             }
             status?.let {
                 Text(
@@ -151,6 +173,17 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                                     editing = m
                                     newName = m.name
                                 }) { Text("Rename", fontSize = 13.sp) }
+                                TextButton(onClick = {
+                                    // Export JSON + PNG, share both.
+                                    val snap =
+                                        MapStore.load(ctx, m.id, activate = false)
+                                    if (snap != null) {
+                                        MapExport.export(ctx, m, snap)
+                                        MapExport.shareIntent(ctx, m)?.let {
+                                            ctx.startActivity(it)
+                                        }
+                                    }
+                                }) { Text("Export", fontSize = 13.sp) }
                                 TextButton(onClick = {
                                     MapStore.delete(ctx, m.id)
                                     maps.remove(m)

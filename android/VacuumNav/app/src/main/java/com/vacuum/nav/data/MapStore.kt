@@ -82,8 +82,9 @@ object MapStore {
         return meta
     }
 
-    /** Load a map's grid; sets [current] so the UI shows it as base layer. */
-    fun load(ctx: Context, id: String): GridSnapshot? {
+    /** Load a map's grid; sets [current] so the UI shows it as base layer
+     *  (pass activate=false for read-only uses like export). */
+    fun load(ctx: Context, id: String, activate: Boolean = true): GridSnapshot? {
         val dir = File(root(ctx), id)
         val metaFile = File(dir, "meta.json")
         val gridFile = File(dir, "grid.bin")
@@ -100,7 +101,7 @@ object MapStore {
                 resolution = o.getDouble("resolution").toFloat(),
                 cells = cells,
                 version = o.getInt("version"),
-            ).also { current = it }
+            ).also { if (activate) current = it }
         }.getOrNull()
     }
 
