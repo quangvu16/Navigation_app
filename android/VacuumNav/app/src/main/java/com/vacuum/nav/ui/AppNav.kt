@@ -1,6 +1,17 @@
 package com.vacuum.nav.ui
 
+import com.vacuum.nav.ui.theme.Rd
+import com.vacuum.nav.ui.theme.Sp
+import com.vacuum.nav.ui.theme.Ts
+
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Gamepad
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -41,14 +52,15 @@ fun AppNav() {
                             sub = ""
                         },
                         icon = {
-                            Text(
-                                when (key) {
-                                    "home" -> "⌂"
-                                    "map" -> "🗺"
-                                    "drive" -> "🕹"
-                                    "zones" -> "🚫"
-                                    else -> "⏰"
-                                }
+                            Icon(
+                                imageVector = when (key) {
+                                    "home" -> Icons.Filled.Home
+                                    "map" -> Icons.Filled.Map
+                                    "drive" -> Icons.Filled.Gamepad
+                                    "zones" -> Icons.Filled.Block
+                                    else -> Icons.Filled.Schedule
+                                },
+                                contentDescription = null,
                             )
                         },
                         label = { Text(label) },

@@ -1,6 +1,11 @@
 package com.vacuum.nav.ui
 
+import com.vacuum.nav.ui.theme.Rd
+import com.vacuum.nav.ui.theme.Sp
+import com.vacuum.nav.ui.theme.Ts
+
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,6 +25,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -56,6 +62,7 @@ fun SchedulesScreen(modifier: Modifier = Modifier) {
     }
     var editing by remember { mutableStateOf<Schedule?>(null) }
     var adding by remember { mutableStateOf(false) }
+    var tab by remember { mutableStateOf("cleaning") }
 
     fun persist() {
         val list = schedules.toList()
@@ -70,51 +77,68 @@ fun SchedulesScreen(modifier: Modifier = Modifier) {
             FloatingActionButton(
                 onClick = { adding = true },
                 containerColor = MaterialTheme.colorScheme.primary,
-            ) { Text("+", fontSize = 22.sp,
+            ) { Text("+", fontSize = Ts.Display,
                 color = androidx.compose.ui.graphics.Color.White) }
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             Text(
                 "Schedules",
-                fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                fontSize = Ts.Display, fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(start = 16.dp, top = 12.dp),
             )
-            LazyColumn(
-                Modifier.fillMaxSize().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = Sp.Md),
+                horizontalArrangement = Arrangement.spacedBy(Sp.Xs),
             ) {
-                listOf(
-                    "cleaning" to "Scheduled Cleaning",
-                    "routine" to "Scheduled Routines",
-                ).forEach { (group, title) ->
-                    val rows = schedules.filter { it.group == group }
-                    if (rows.isNotEmpty()) {
-                        item(key = "h-$group") {
+                listOf("cleaning" to "Cleaning", "routine" to "Routines").forEach { (key, label) ->
+                    val selected = tab == key
+                    Surface(
+                        onClick = { tab = key },
+                        modifier = Modifier.weight(1f).height(40.dp),
+                        shape = RoundedCornerShape(50),
+                        color = if (selected) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
                             Text(
-                                title, fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme
-                                    .onSurfaceVariant,
-                                modifier = Modifier.padding(top = 8.dp),
-                            )
-                        }
-                        items(rows, key = { it.id }) { s ->
-                            ScheduleRow(
-                                s,
-                                onToggle = { on ->
-                                    val i = schedules.indexOfFirst {
-                                        it.id == s.id }
-                                    if (i >= 0) {
-                                        schedules[i] =
-                                            schedules[i].copy(enabled = on)
-                                        persist()
-                                    }
-                                },
-                                onClick = { editing = s },
+                                label, fontSize = Ts.Body,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
+                }
+            }
+            LazyColumn(
+                Modifier.fillMaxSize().padding(Sp.Md),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                val rows = schedules.filter { it.group == tab }
+                if (rows.isEmpty()) {
+                    item {
+                        Text(
+                            if (tab == "cleaning") "No cleanings yet. Tap + to add one."
+                            else "No routines yet. Tap + to add one.",
+                            fontSize = Ts.Body,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                }
+                items(rows, key = { it.id }) { s ->
+                    ScheduleRow(
+                        s,
+                        onToggle = { on ->
+                            val i = schedules.indexOfFirst { it.id == s.id }
+                            if (i >= 0) {
+                                schedules[i] = schedules[i].copy(enabled = on)
+                                persist()
+                            }
+                        },
+                        onClick = { editing = s },
+                    )
                 }
                 item { Spacer(Modifier.height(72.dp)) }
             }
@@ -145,25 +169,25 @@ private fun ScheduleRow(s: Schedule, onToggle: (Boolean) -> Unit,
                         onClick: () -> Unit) {
     Card(
         onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(Rd.M),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().padding(horizontal = Sp.Md, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 s.timeText,
-                fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                fontSize = Ts.Display, fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(end = 16.dp),
             )
             Column(Modifier.weight(1f)) {
-                Text(s.daysText, fontSize = 13.sp,
+                Text(s.daysText, fontSize = Ts.Body,
                     fontWeight = FontWeight.Medium)
                 Text(
-                    s.label, fontSize = 12.sp,
+                    s.label, fontSize = Ts.Caption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -207,7 +231,7 @@ private fun ScheduleDialog(initial: Schedule?, onSave: (Schedule) -> Unit,
                                 else days or (1 shl i)
                             }) {
                                 Text(
-                                    d, fontSize = 11.sp,
+                                    d, fontSize = Ts.Caption,
                                     color = if (on) MaterialTheme.colorScheme
                                         .primary
                                     else MaterialTheme.colorScheme

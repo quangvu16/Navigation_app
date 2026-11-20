@@ -1,5 +1,9 @@
 package com.vacuum.nav.ui
 
+import com.vacuum.nav.ui.theme.Rd
+import com.vacuum.nav.ui.theme.Sp
+import com.vacuum.nav.ui.theme.Ts
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -92,7 +96,7 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     }
                 },
                 containerColor = MaterialTheme.colorScheme.primary,
-            ) { Text("💾", fontSize = 20.sp) }
+            ) { Text("💾", fontSize = Ts.Headline) }
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
@@ -101,35 +105,35 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextButton(onClick = onBack) { Text("‹ Back") }
-                Text("Maps", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("Maps", fontSize = Ts.Display, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = {
                     importLauncher.launch(arrayOf("application/json", "*/*"))
-                }) { Text("Import", fontSize = 14.sp) }
+                }) { Text("Import", fontSize = Ts.Body) }
             }
             status?.let {
                 Text(
-                    it, fontSize = 13.sp,
+                    it, fontSize = Ts.Body,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = Sp.Md),
                 )
             }
             if (maps.isEmpty()) {
                 Spacer(Modifier.height(24.dp))
                 Text(
                     "No saved maps yet. Explore a floor, then tap 💾.",
-                    fontSize = 14.sp,
+                    fontSize = Ts.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = Sp.Md),
                 )
             }
             LazyColumn(
-                Modifier.fillMaxSize().padding(16.dp),
+                Modifier.fillMaxSize().padding(Sp.Md),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(maps, key = { it.id }) { m ->
                     Card(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(Rd.M),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme
                                 .surfaceVariant,
@@ -145,18 +149,18 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                             }
                         },
                     ) {
-                        Column(Modifier.padding(16.dp)) {
+                        Column(Modifier.padding(Sp.Md)) {
                             Row(
                                 Modifier.fillMaxWidth(),
                                 horizontalArrangement =
                                     Arrangement.SpaceBetween,
                             ) {
                                 Text(
-                                    m.name, fontSize = 16.sp,
+                                    m.name, fontSize = Ts.Title,
                                     fontWeight = FontWeight.SemiBold,
                                 )
                                 Text(
-                                    "Floor ${m.floor}", fontSize = 13.sp,
+                                    "Floor ${m.floor}", fontSize = Ts.Body,
                                     color = MaterialTheme.colorScheme
                                         .onSurfaceVariant,
                                 )
@@ -164,7 +168,7 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                             Text(
                                 "${m.width}×${m.height} · " +
                                     fmt.format(Date(m.savedAtMs)),
-                                fontSize = 12.sp,
+                                fontSize = Ts.Caption,
                                 color = MaterialTheme.colorScheme
                                     .onSurfaceVariant,
                             )
@@ -172,7 +176,7 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                                 TextButton(onClick = {
                                     editing = m
                                     newName = m.name
-                                }) { Text("Rename", fontSize = 13.sp) }
+                                }) { Text("Rename", fontSize = Ts.Body) }
                                 TextButton(onClick = {
                                     // Export JSON + PNG, share both.
                                     val snap =
@@ -183,12 +187,12 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                                             ctx.startActivity(it)
                                         }
                                     }
-                                }) { Text("Export", fontSize = 13.sp) }
+                                }) { Text("Export", fontSize = Ts.Body) }
                                 TextButton(onClick = {
                                     MapStore.delete(ctx, m.id)
                                     maps.remove(m)
                                     status = "Deleted ${m.name}"
-                                }) { Text("Delete", fontSize = 13.sp) }
+                                }) { Text("Delete", fontSize = Ts.Body) }
                             }
                         }
                     }

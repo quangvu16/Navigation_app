@@ -1,5 +1,9 @@
 package com.vacuum.nav.ui
 
+import com.vacuum.nav.ui.theme.Rd
+import com.vacuum.nav.ui.theme.Sp
+import com.vacuum.nav.ui.theme.Ts
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,9 +18,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Gamepad
+import androidx.compose.material.icons.filled.GridOff
+import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.ViewInAr
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -87,7 +102,7 @@ fun MapScreen(
     Column(modifier.fillMaxSize()) {
         // ---- stats header ------------------------------------------------
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            Modifier.fillMaxWidth().padding(horizontal = Sp.Md, vertical = Sp.Xs),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Stat("Clean Area", RunStats.areaText())
@@ -158,12 +173,12 @@ fun MapScreen(
                 modifier = Modifier.fillMaxSize(),
             )
             Column(
-                Modifier.align(Alignment.CenterEnd).padding(8.dp),
+                Modifier.align(Alignment.CenterEnd).padding(Sp.Xs),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                RailButton("🚫", "Zones") { onOpenZones() }
-                RailButton("🕹", "Drive") { onOpenDrive() }
-                RailButton("💾", "Save") {
+                RailButton(Icons.Filled.Block, "Zones") { onOpenZones() }
+                RailButton(Icons.Filled.Gamepad, "Drive") { onOpenDrive() }
+                RailButton(Icons.Filled.Save, "Save") {
                     val snap = mapSnap
                     if (snap != null) {
                         val n = MapStore.list(ctx)
@@ -175,13 +190,13 @@ fun MapScreen(
                     }
                 }
                 RailButton(
-                    if (RobotService.exploreActive) "🛑" else "🧭",
+                    if (RobotService.exploreActive) Icons.Filled.Stop else Icons.Filled.Explore,
                     if (RobotService.exploreActive) "Stop" else "Explore",
                 ) { RobotService.toggleExplore() }
-                RailButton(if (showGrid) "▦" else "▢", "Grid") {
+                RailButton(if (showGrid) Icons.Filled.GridOn else Icons.Filled.GridOff, "Grid") {
                     showGrid = !showGrid
                 }
-                RailButton("⬡", if (iso) "3D" else "2D") { iso = !iso }
+                RailButton(Icons.Filled.ViewInAr, if (iso) "3D" else "2D") { iso = !iso }
             }
             if (mode == 1) {
                 val rooms = segResult?.rooms
@@ -194,7 +209,7 @@ fun MapScreen(
                     var roomName by remember { mutableStateOf("") }
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Sp.Xxs),
                     ) {
                         rooms.forEach { r ->
                             val selected =
@@ -215,12 +230,12 @@ fun MapScreen(
                                     com.vacuum.nav.data.RoomNames
                                         .get(ctx, r.id) +
                                         " · %.1f m²".format(r.areaM2),
-                                    fontSize = 11.sp,
+                                    fontSize = Ts.Caption,
                                     color = if (selected) Color.White
                                     else MaterialTheme.colorScheme
                                         .onSurfaceVariant,
                                     modifier = Modifier.padding(
-                                        horizontal = 10.dp, vertical = 6.dp),
+                                        horizontal = 10.dp, vertical = Sp.Xs),
                                 )
                             }
                         }
@@ -228,7 +243,7 @@ fun MapScreen(
                     // Rename / merge (stable-id edits, prompt §5).
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Sp.Xs),
                     ) {
                         if (RobotService.selectedRooms.size == 1) {
                             TextButton(onClick = {
@@ -236,7 +251,7 @@ fun MapScreen(
                                 roomName = com.vacuum.nav.data.RoomNames
                                     .get(ctx, id)
                                 renaming = id
-                            }) { Text("Rename", fontSize = 12.sp) }
+                            }) { Text("Rename", fontSize = Ts.Caption) }
                         }
                         if (RobotService.selectedRooms.size == 2) {
                             TextButton(onClick = {
@@ -245,12 +260,12 @@ fun MapScreen(
                                 RobotService.nav?.mergeRooms(a, b)
                                 RobotService.selectedRooms = setOf(b)
                                 navMessage = "Merged rooms"
-                            }) { Text("Merge", fontSize = 12.sp) }
+                            }) { Text("Merge", fontSize = Ts.Caption) }
                         }
                         if (RobotService.selectedRooms.isNotEmpty()) {
                             TextButton(onClick = {
                                 RobotService.selectedRooms = emptySet()
-                            }) { Text("Clear", fontSize = 12.sp) }
+                            }) { Text("Clear", fontSize = Ts.Caption) }
                         }
                     }
                     if (renaming != null) {
@@ -328,8 +343,8 @@ fun MapScreen(
 
         // ---- mode tabs ---------------------------------------------------
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            Modifier.fillMaxWidth().padding(horizontal = Sp.Md),
+            horizontalArrangement = Arrangement.spacedBy(Sp.Xs),
         ) {
             ModeTab("Full", mode == 0, Modifier.weight(1f)) { mode = 0 }
             ModeTab("Rooms", mode == 1, Modifier.weight(1f)) { mode = 1 }
@@ -338,8 +353,8 @@ fun MapScreen(
 
         // ---- transport controls -----------------------------------------
         Row(
-            Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.fillMaxWidth().padding(Sp.Md),
+            horizontalArrangement = Arrangement.spacedBy(Sp.Sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Button(
@@ -374,10 +389,10 @@ fun MapScreen(
                 )
             }
             FilledTonalButton(
-                onClick = { RobotService.stopCleaning() },
+                onClick = { RobotService.goDock(ctx) },
                 Modifier.weight(1f).height(48.dp),
                 shape = RoundedCornerShape(50),
-            ) { Text("Stop") }
+            ) { Text("Dock") }
             Button(
                 onClick = { RobotService.setEstop(!eStop) },
                 Modifier.weight(1f).height(48.dp),
@@ -473,14 +488,14 @@ private fun buildRoomsImage(
 @Composable
 private fun Stat(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text(label, fontSize = 11.sp,
+        Text(value, fontSize = Ts.Headline, fontWeight = FontWeight.Bold)
+        Text(label, fontSize = Ts.Caption,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
-private fun RailButton(icon: String, desc: String, onClick: () -> Unit) {
+private fun RailButton(icon: ImageVector, desc: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = CircleShape,
@@ -492,8 +507,8 @@ private fun RailButton(icon: String, desc: String, onClick: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Text(icon, fontSize = 18.sp)
-            Text(desc, fontSize = 8.sp,
+            Icon(icon, contentDescription = desc, modifier = Modifier.size(22.dp))
+            Text(desc, fontSize = Ts.Micro,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -511,7 +526,7 @@ private fun ModeTab(label: String, selected: Boolean, modifier: Modifier,
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
-                label, fontSize = 14.sp,
+                label, fontSize = Ts.Body,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                 color = if (selected) Color.White
                 else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -528,7 +543,7 @@ private fun androidx.compose.foundation.layout.BoxScope.ModeHint(text: String) {
         color = Color.Black.copy(alpha = 0.6f),
     ) {
         Text(
-            text, color = Color.White, fontSize = 12.sp,
+            text, color = Color.White, fontSize = Ts.Caption,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
         )
     }

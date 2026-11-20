@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- VacuumNav logo: top-view robot vacuum - teal disc, heading arrow,
+     lidar sweep arcs. Used as the adaptive-icon foreground AND shown on
+     the welcome screen (transparent background works on both the card
+     and the icon background layer). Content kept inside the adaptive
+     safe zone (viewport 108, art ~27..81). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Outer bumper ring -->
+    <path
+        android:pathData="M54,22 A32,32 0 1,1 53.99,22"
+        android:strokeColor="#0B7A6A"
+        android:strokeWidth="5"
+        android:fillColor="#00000000" />
+
+    <!-- Vacuum body -->
+    <path
+        android:pathData="M54,26 A28,28 0 1,1 53.99,26"
+        android:fillColor="#0B7A6A" />
+
+    <!-- Heading arrow (white) -->
+    <path
+        android:pathData="M54,34 L64,54 L54,49 L44,54 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Lidar sweep arcs -->
+    <path
+        android:pathData="M36,66 A24,24 0 0,0 72,66"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.5"
+        android:strokeAlpha="0.85"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M41,72 A18,18 0 0,0 67,72"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeAlpha="0.55"
+        android:fillColor="#00000000" />
+</vector>

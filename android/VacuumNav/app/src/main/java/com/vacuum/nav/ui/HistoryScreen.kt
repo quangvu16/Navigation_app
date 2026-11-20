@@ -1,5 +1,9 @@
 package com.vacuum.nav.ui
 
+import com.vacuum.nav.ui.theme.Rd
+import com.vacuum.nav.ui.theme.Sp
+import com.vacuum.nav.ui.theme.Ts
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,32 +57,32 @@ fun HistoryScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextButton(onClick = onBack) { Text("‹ Back") }
-                Text("History", fontSize = 22.sp,
+                Text("History", fontSize = Ts.Display,
                     fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
                 if (runs.isNotEmpty()) {
                     TextButton(onClick = {
                         HistoryStore.clear(ctx)
                         runs.clear()
-                    }) { Text("Clear", fontSize = 13.sp) }
+                    }) { Text("Clear", fontSize = Ts.Body) }
                 }
             }
             if (runs.isEmpty()) {
                 Spacer(Modifier.height(24.dp))
                 Text(
                     "No runs yet — start a clean and it will show up here.",
-                    fontSize = 14.sp,
+                    fontSize = Ts.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = Sp.Md),
                 )
             }
             LazyColumn(
-                Modifier.fillMaxSize().padding(16.dp),
+                Modifier.fillMaxSize().padding(Sp.Md),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(runs, key = { it.id }) { r ->
                     Card(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(Rd.M),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme
                                 .surfaceVariant,
@@ -86,14 +90,14 @@ fun HistoryScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Row(
-                            Modifier.fillMaxWidth().padding(16.dp),
+                            Modifier.fillMaxWidth().padding(Sp.Md),
                             horizontalArrangement =
                                 Arrangement.SpaceBetween,
                         ) {
                             Column {
                                 Text(
                                     fmt.format(Date(r.startedAtMs)),
-                                    fontSize = 15.sp,
+                                    fontSize = Ts.Body,
                                     fontWeight = FontWeight.SemiBold,
                                 )
                                 Text(
@@ -102,13 +106,13 @@ fun HistoryScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                                         if (r.coveragePct > 0)
                                             " · %.0f%%".format(r.coveragePct)
                                         else "",
-                                    fontSize = 12.sp,
+                                    fontSize = Ts.Caption,
                                     color = MaterialTheme.colorScheme
                                         .onSurfaceVariant,
                                 )
                             }
                             Text(
-                                r.mode, fontSize = 12.sp,
+                                r.mode, fontSize = Ts.Caption,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }

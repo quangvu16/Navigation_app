@@ -1,5 +1,9 @@
 package com.vacuum.nav.ui
 
+import com.vacuum.nav.ui.theme.Rd
+import com.vacuum.nav.ui.theme.Sp
+import com.vacuum.nav.ui.theme.Ts
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,12 +15,26 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.Image
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.ui.res.painterResource
+import com.vacuum.nav.R
+import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,10 +49,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vacuum.nav.data.RunStats
+import com.vacuum.nav.data.ScheduleStore
 import com.vacuum.nav.robot.RobotConfig
 import com.vacuum.nav.service.RobotService
 import com.vacuum.nav.ui.theme.RobotOrange
@@ -64,6 +84,12 @@ fun HomeScreen(
     // Bumped after a transport switch so the chip re-reads RobotService.link.
     var linkVersion by remember { mutableStateOf(0) }
     val linkType = remember(linkVersion) { transportOf(RobotService.link) }
+
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val nextScheduleText = remember {
+        ScheduleStore.load(ctx).filter { it.enabled }
+            .minByOrNull { it.hour * 60 + it.minute }?.timeText ?: "—"
+    }
 
     val batteryPct = when {
         eStop -> "—"
@@ -95,7 +121,7 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Welcome home!", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text("Welcome home!", fontSize = Ts.Display, fontWeight = FontWeight.Bold)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Transport chip: SIM / Wi-Fi / BLE (FriendBot-style link).
                 TextButton(onClick = {
@@ -107,11 +133,13 @@ fun HomeScreen(
                             Transport.UDP -> "📶 Wi-Fi"
                             Transport.BLE -> "蓝牙 BLE"
                         },
-                        fontSize = 13.sp,
+                        fontSize = Ts.Body,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
-                TextButton(onClick = onOpenDiagnostics) { Text("⚙") }
+                TextButton(onClick = onOpenDiagnostics) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Diagnostics")
+                }
             }
         }
         Spacer(Modifier.height(4.dp))
@@ -119,7 +147,7 @@ fun HomeScreen(
             if (eStop) "Robot stopped — E-STOP pressed"
             else if (autoClean) "Cleaning now…"
             else "Ready to clean",
-            fontSize = 14.sp,
+            fontSize = Ts.Body,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(20.dp))
@@ -127,14 +155,14 @@ fun HomeScreen(
         // Robot card (reference: product shot + battery + Enter).
         Card(
             Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(Rd.L),
             colors = CardDefaults.cardColors(
-                containerColor = Color(0xFF14213D)
+                containerColor = MaterialTheme.colorScheme.primaryContainer
             ),
             elevation = CardDefaults.cardElevation(6.dp),
         ) {
             Column(
-                Modifier.fillMaxWidth().padding(24.dp),
+                Modifier.fillMaxWidth().padding(Sp.Lg),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Row(
@@ -143,8 +171,8 @@ fun HomeScreen(
                 ) {
                     Text(
                         RobotConfig().robotName,
-                        fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
+                        fontSize = Ts.Headline, fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                     Surface(
                         shape = RoundedCornerShape(50),
@@ -160,7 +188,7 @@ fun HomeScreen(
                                 autoClean -> "CLEANING"
                                 else -> "SIM · IDLE"
                             },
-                            fontSize = 12.sp,
+                            fontSize = Ts.Caption,
                             fontWeight = FontWeight.Bold,
                             color = when {
                                 eStop -> MaterialTheme.colorScheme.error
@@ -173,7 +201,8 @@ fun HomeScreen(
                     }
                 }
                 Spacer(Modifier.height(20.dp))
-                // Robot "product shot": a disc with the heading arrow.
+                // Robot "product shot": the app logo (same art as the
+                // launcher icon) on a soft disc.
                 Box(
                     Modifier.size(150.dp)
                         .background(
@@ -184,31 +213,53 @@ fun HomeScreen(
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("🛞", fontSize = 64.sp)
+                    Image(
+                        painter = painterResource(
+                            R.drawable.ic_launcher_foreground),
+                        contentDescription = "VacuumNav logo",
+                        modifier = Modifier.size(110.dp),
+                    )
                 }
                 Spacer(Modifier.height(12.dp))
-                Text(
-                    "🔋 $batteryPct",
-                    fontSize = 28.sp, fontWeight = FontWeight.Bold,
-                    color = if (eStop) MaterialTheme.colorScheme.error
-                    else Color.White,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.BatteryChargingFull,
+                        contentDescription = null,
+                        tint = if (eStop) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(28.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        batteryPct,
+                        fontSize = Ts.XL, fontWeight = FontWeight.Bold,
+                        color = if (eStop) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
                 Text(
                     "Battery · ${"%.1f".format(telemetry.batteryV)} V",
-                    fontSize = 13.sp,
-                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = Ts.Body,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                 )
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    StatTile("Last clean",
+                        "${RunStats.areaText()} · ${RunStats.timeText()}",
+                        Modifier.weight(1f))
+                    StatTile("Next schedule", nextScheduleText, Modifier.weight(1f))
+                }
                 Spacer(Modifier.height(20.dp))
                 Button(
                     onClick = onEnter,
                     Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF2BB3A0),
-                        contentColor = Color(0xFF06201C),
+                        containerColor = RobotOrange,
                     ),
                 ) {
-                    Text("Enter", fontSize = 17.sp,
+                    Text("Open 3D map", fontSize = Ts.Title,
                         fontWeight = FontWeight.SemiBold)
                 }
             }
@@ -219,34 +270,37 @@ fun HomeScreen(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("Routines", fontSize = 16.sp,
+            Text("Routines", fontSize = Ts.Title,
                 fontWeight = FontWeight.SemiBold)
             TextButton(onClick = onOpenSchedules) { Text("See all") }
         }
         Spacer(Modifier.height(8.dp))
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(Sp.Sm),
         ) {
             RoutineChip(
-                "🍽 After Meals",
+                "After Meals",
                 "Quick clean",
+                Icons.Filled.Restaurant,
                 Modifier.weight(1f),
             ) {
                 RobotService.startCleaning()
                 onEnter()
             }
             RoutineChip(
-                "🏠 Full Cleaning",
+                "Full Cleaning",
                 "Whole home",
+                Icons.Filled.CleaningServices,
                 Modifier.weight(1f),
             ) {
                 RobotService.startCleaning()
                 onEnter()
             }
             RoutineChip(
-                "＋ Add",
+                "Add",
                 "New routine",
+                Icons.Filled.Add,
                 Modifier.weight(1f),
                 onClick = onOpenSchedules,
             )
@@ -255,23 +309,26 @@ fun HomeScreen(
         Spacer(Modifier.height(16.dp))
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(Sp.Sm),
         ) {
             RoutineChip(
-                "🗺 Maps",
+                "Maps",
                 "Floors: save / load",
+                Icons.Filled.Map,
                 Modifier.weight(1f),
                 onClick = onOpenMaps,
             )
             RoutineChip(
-                "🧾 History",
+                "History",
                 "Past runs",
+                Icons.Filled.History,
                 Modifier.weight(1f),
                 onClick = onOpenHistory,
             )
             RoutineChip(
-                "⏰ Schedules",
+                "Schedules",
                 "Timed cleans",
+                Icons.Filled.Schedule,
                 Modifier.weight(1f),
                 onClick = onOpenSchedules,
             )
@@ -281,7 +338,7 @@ fun HomeScreen(
         Text(
             "Stats · ${RunStats.areaText()} cleaned · " +
                 "${RunStats.runs} runs · ${RunStats.timeText()}",
-            fontSize = 12.sp,
+            fontSize = Ts.Caption,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -298,22 +355,26 @@ fun HomeScreen(
 private fun RoutineChip(
     title: String,
     subtitle: String,
+    icon: ImageVector,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(Rd.L),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
         onClick = onClick,
     ) {
-        Column(Modifier.padding(12.dp)) {
-            Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Column(Modifier.padding(Sp.Sm)) {
+            Icon(icon, contentDescription = null, tint = RobotOrange,
+                modifier = Modifier.size(20.dp))
+            Spacer(Modifier.height(4.dp))
+            Text(title, fontSize = Ts.Body, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
-                subtitle, fontSize = 11.sp,
+                subtitle, fontSize = Ts.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -339,7 +400,7 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                 Text(
                     "Full RobotConfig editing + calibration wizard arrive " +
                         "with Phase 2 hardware.",
-                    fontSize = 12.sp,
+                    fontSize = Ts.Caption,
                 )
             }
         },
@@ -347,4 +408,19 @@ private fun AboutDialog(onDismiss: () -> Unit) {
             TextButton(onClick = onDismiss) { Text("Close") }
         },
     )
+}
+
+@Composable
+private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(Rd.M),
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(Modifier.padding(Sp.Sm)) {
+            Text(label, fontSize = Ts.Caption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, fontSize = Ts.Body, fontWeight = FontWeight.Medium)
+        }
+    }
 }

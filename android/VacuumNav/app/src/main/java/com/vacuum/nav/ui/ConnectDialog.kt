@@ -1,5 +1,9 @@
 package com.vacuum.nav.ui
 
+import com.vacuum.nav.ui.theme.Rd
+import com.vacuum.nav.ui.theme.Sp
+import com.vacuum.nav.ui.theme.Ts
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -88,7 +92,7 @@ fun ConnectDialog(onDismiss: () -> Unit) {
         title = { Text("Connect to robot") },
         text = {
             Column {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Sp.Xs)) {
                     OutlinedButton(onClick = { tab = Transport.SIM }) {
                         Text("SIM",
                             fontWeight = if (tab == Transport.SIM)
@@ -137,17 +141,17 @@ fun ConnectDialog(onDismiss: () -> Unit) {
                         Text(
                             "Bluetooth LE (FriendBot GATT): instant, no Wi-Fi " +
                                 "network needed.",
-                            fontSize = 12.sp,
+                            fontSize = Ts.Caption,
                         )
                         Spacer(Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Sp.Xs)) {
                             TextButton(onClick = { requireBlePermsAndScan() }) {
                                 Text(if (scanning) "Scanning…" else "Scan again")
                             }
                         }
                         if (bleDevices.isEmpty() && !scanning) {
                             Text("No boards found - is the robot powered and " +
-                                "Bluetooth on?", fontSize = 12.sp)
+                                "Bluetooth on?", fontSize = Ts.Caption)
                         }
                         LazyColumn(Modifier.height(160.dp)) {
                             items(bleDevices) { r ->
@@ -158,7 +162,7 @@ fun ConnectDialog(onDismiss: () -> Unit) {
                                     Text(
                                         (r.device.name ?: "Unknown") + "\n" +
                                             r.device.address,
-                                        fontSize = 13.sp,
+                                        fontSize = Ts.Body,
                                     )
                                 }
                             }

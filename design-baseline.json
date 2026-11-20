@@ -1,0 +1,58 @@
+{
+  "tool": "mobile-design-review",
+  "version": 1,
+  "date": "2026-11-20",
+  "app": "VacuumNav (Kotlin/Jetpack Compose - RN checklist adapted to Compose sources)",
+  "mode": "overhaul",
+  "brief": "Use google theme with icons",
+  "designScore": "B",
+  "slopScore": "B",
+  "scoreNotes": "Design capped at B (high-impact FINDING-001 open, rubric no-rounding-up). Slop capped at B (FINDING-001 is tell-mapped and high).",
+  "categories": {
+    "navigation": "B+",
+    "screenAnatomy": "A-",
+    "typography": "A-",
+    "colorTheming": "B",
+    "surfacesGrouping": "A-",
+    "states": "A-",
+    "interactionMotion": "A-",
+    "formsInput": "A-",
+    "performance": "A",
+    "copyContent": "B"
+  },
+  "findings": [
+    { "id": "FINDING-001", "impact": "high", "category": "color", "tell": 6,
+      "summary": "Three competing accents (teal #0B7A6A, blue CTAs, green status #7BE0B0) and 35 inline hex literals across screen files; no semantic color token layer beyond Theme.kt's scheme", "status": "open" },
+    { "id": "FINDING-002", "impact": "high", "category": "navigation", "tell": null,
+      "summary": "Android/gesture back from sub-screens (Maps, History, Diagnostics) exits the app - no BackHandler pops to Home; nav mechanical check fails", "status": "open" },
+    { "id": "FINDING-003", "impact": "medium", "category": "copy", "tell": 30,
+      "summary": "'Welcome home!' greeting as the primary Home header; personalization is not the product", "status": "open" },
+    { "id": "FINDING-004", "impact": "medium", "category": "anatomy", "tell": 27,
+      "summary": "Manual '‹ Back' text buttons (x3) instead of a TopAppBar with navigation icon; no header owner on sub-screens", "status": "open" },
+    { "id": "FINDING-005", "impact": "medium", "category": "states", "tell": 38,
+      "summary": "Link ERROR_LINK exists in code but no UI banner; loading is plain text with no skeleton; no standard empty/error treatment", "status": "open" },
+    { "id": "FINDING-006", "impact": "medium", "category": "typography", "tell": null,
+      "summary": "No type scale or spacing rhythm: raw sp values (11..32) and ad-hoc dp scattered per screen", "status": "open" },
+    { "id": "FINDING-007", "impact": "medium", "category": "surfaces", "tell": 11,
+      "summary": "Radius drift: 14/16/20/24/28/50 in active use with no shape lock", "status": "open" },
+    { "id": "FINDING-008", "impact": "medium", "category": "interaction", "tell": 1,
+      "summary": "Emoji as icons/controls remain in13 places (transport chip, mode chips, dock buttons, save, warnings) after the nav bar migrated to Material icons", "status": "open" },
+    { "id": "FINDING-009", "impact": "polish", "category": "color", "tell": 8,
+      "summary": "Map screen opens with a stat-triplet header; metrics are real (area/times/time) so triage = restyle under tokens, keep the numbers", "status": "open" },
+    { "id": "FINDING-010", "impact": "polish", "category": "copy", "tell": 33,
+      "summary": "Em-dashes in visible strings ('Stuck — gave up', 'Robot stopped — E-STOP') against the copy rules", "status": "open" }
+  ],
+  "signaturesToPreserve": [
+    "deadman joystick (release = stop)",
+    "E-STOP always visible",
+    "long-press map to set goal",
+    "Manual/Avoid/Follow behaviour chips",
+    "bottom tab order (5 tabs, existing icons)",
+    "warning banner semantics (red frame + distance/bearing)"
+  ],
+  "unverified": [
+    "device disconnected mid-audit: dark mode live pass, 1.3x font scale, IME/keyboard",
+    "Trunk Test for interior screens is code-reconstructed, not cold-dropped",
+    "RN grep checklist adapted to Kotlin/Compose - emoji/hex/back greps run for real, RN-specific ones (ScrollView-of-map, useNativeDriver, GestureHandlerRootView) are N/A"
+  ]
+}

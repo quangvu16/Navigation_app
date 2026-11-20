@@ -1,5 +1,9 @@
 package com.vacuum.nav.ui
 
+import com.vacuum.nav.ui.theme.Rd
+import com.vacuum.nav.ui.theme.Sp
+import com.vacuum.nav.ui.theme.Ts
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -92,16 +96,16 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextButton(onClick = onBack) { Text("‹ Back") }
-                Text("Diagnostics", fontSize = 22.sp,
+                Text("Diagnostics", fontSize = Ts.Display,
                     fontWeight = FontWeight.Bold)
             }
 
             Section("Link") {
-                Text("Transport: ${stats.transport}", fontSize = 14.sp)
+                Text("Transport: ${stats.transport}", fontSize = Ts.Body)
                 Text(
                     "Lidar: ${stats.scanHz} Hz · Telemetry: " +
                         "${stats.telemHz} Hz",
-                    fontSize = 14.sp,
+                    fontSize = Ts.Body,
                 )
                 val scanAge = stats.lastScanAgeMs
                 Text(
@@ -110,7 +114,7 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         scanAge > 3000 -> "${scanAge / 1000} s ago ⚠"
                         else -> "$scanAge ms ago"
                     },
-                    fontSize = 14.sp,
+                    fontSize = Ts.Body,
                 )
                 Text(
                     "Last telemetry: " + when {
@@ -119,30 +123,30 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                             "${stats.lastTelemAgeMs} ms ago ⚠"
                         else -> "${stats.lastTelemAgeMs} ms ago"
                     },
-                    fontSize = 14.sp,
+                    fontSize = Ts.Body,
                 )
             }
 
             Section("Robot") {
                 Text(
                     "Battery: ${"%.2f".format(telemetry.batteryV)} V",
-                    fontSize = 14.sp,
+                    fontSize = Ts.Body,
                 )
                 Text(
                     "Sonar F ${fmtM(telemetry.sonarFrontM)} · " +
                         "L ${fmtM(telemetry.sonarLeftM)} · " +
                         "R ${fmtM(telemetry.sonarRightM)}",
-                    fontSize = 14.sp,
+                    fontSize = Ts.Body,
                 )
                 Text(
                     "Ticks ${telemetry.ticksL}/${telemetry.ticksR} · " +
                         "RPM ${telemetry.rpmL}/${telemetry.rpmR}",
-                    fontSize = 14.sp,
+                    fontSize = Ts.Body,
                 )
                 Text(
                     "Runs ${RunStats.runs} · ${RunStats.areaText()} · " +
                         RunStats.timeText(),
-                    fontSize = 14.sp,
+                    fontSize = Ts.Body,
                 )
             }
 
@@ -152,19 +156,19 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         "${it.width}×${it.height} cells · keyframes " +
                             it.version
                     } ?: "not built yet"),
-                    fontSize = 14.sp,
+                    fontSize = Ts.Body,
                 )
                 Text(
                     "Nav: " +
                         com.vacuum.nav.robot.NavState.label(navState.state) +
                         " · explore=${RobotService.exploreActive} · " +
                         "dock=${RobotService.dockPhase}",
-                    fontSize = 14.sp,
+                    fontSize = Ts.Body,
                 )
                 Text(
                     "Queue: ${RobotService.coverageQueue.size} waypoints · " +
                         "rooms ${RobotService.selectedRooms}",
-                    fontSize = 14.sp,
+                    fontSize = Ts.Body,
                 )
             }
 
@@ -172,25 +176,25 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 Text(
                     "wheel r ${cfg.wheelRadiusM} m · track " +
                         "${cfg.trackWidthM} m · ticks ${cfg.ticksPerRev}",
-                    fontSize = 13.sp,
+                    fontSize = Ts.Body,
                 )
                 Text(
                     "lidar ${cfg.scanBins} bins · mirror ${cfg.lidarMirror} · " +
                         "yaw ${cfg.lidarMountYawDeg}° · " +
                         "range ${cfg.lidarMinRangeM}–${cfg.lidarMaxRangeM} m",
-                    fontSize = 13.sp,
+                    fontSize = Ts.Body,
                 )
                 Text(
                     "limits ${cfg.maxLinearMps} m/s · " +
                         "${cfg.maxAngularRps} rad/s · ports " +
                         "${cfg.boardScanPort}/${cfg.boardCmdPort}/" +
                         "${cfg.boardTelemPort}",
-                    fontSize = 13.sp,
+                    fontSize = Ts.Body,
                 )
             }
 
             Row(
-                Modifier.fillMaxWidth().padding(16.dp),
+                Modifier.fillMaxWidth().padding(Sp.Md),
                 horizontalArrangement =
                     androidx.compose.foundation.layout.Arrangement.End,
             ) {
@@ -214,13 +218,13 @@ private fun fmtM(m: Float) = if (m <= 0f) "—" else "%.2f m".format(m)
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
     Card(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(16.dp),
+        Modifier.fillMaxWidth().padding(horizontal = Sp.Md, vertical = Sp.Xs),
+        shape = RoundedCornerShape(Rd.M),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Column(Modifier.padding(16.dp)) {
-            Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+        Column(Modifier.padding(Sp.Md)) {
+            Text(title, fontSize = Ts.Body, fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(6.dp))
             content()

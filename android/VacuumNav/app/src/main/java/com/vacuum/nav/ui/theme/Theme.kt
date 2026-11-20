@@ -12,18 +12,27 @@ import androidx.compose.ui.graphics.Color
 val MapUnknown = Color(0xFF2A2D32)
 val MapFree = Color(0xFFE8E6E1)
 val MapWall = Color(0xFF4A4D52)
-val RobotOrange = Color(0xFFFF6D00)
+// Accent colour: Google blue (Material 3 primary). White text stays readable
+// on it. The name is kept so existing call sites keep working.
+val RobotOrange = Color(0xFF0B57D0)
 val LidarCyan = Color(0xFF00B8D4)
-val DangerRed = Color(0xFFD32F2F)
+val DangerRed = Color(0xFFB3261E)
 
 private val LightColors = lightColorScheme(
     primary = RobotOrange,
+    primaryContainer = Color(0xFFD3E3FD),
+    onPrimaryContainer = Color(0xFF041E49),
     error = DangerRed,
+    background = Color(0xFFF8FAFD),
+    surface = Color(0xFFFFFFFF),
+    surfaceVariant = Color(0xFFE9EEF6),
+    onSurface = Color(0xFF1F1F1F),
+    onSurfaceVariant = Color(0xFF444746),
 )
 
 private val DarkColors = darkColorScheme(
-    primary = RobotOrange,
-    error = DangerRed,
+    primary = Color(0xFFA8C7FA),
+    error = Color(0xFFF2B8B5),
 )
 
 @Composable

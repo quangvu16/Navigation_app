@@ -1,5 +1,9 @@
 package com.vacuum.nav.ui
 
+import com.vacuum.nav.ui.theme.Rd
+import com.vacuum.nav.ui.theme.Sp
+import com.vacuum.nav.ui.theme.Ts
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -61,14 +65,14 @@ fun DriveScreen(modifier: Modifier = Modifier) {
     val mode = lidarState.mode
 
     Column(
-        modifier.fillMaxSize().padding(16.dp),
+        modifier.fillMaxSize().padding(Sp.Md),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Drive", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text("Drive", fontSize = Ts.Display, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
         Text(
             "Hold to drive · release to stop",
-            fontSize = 13.sp,
+            fontSize = Ts.Body,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
@@ -76,7 +80,7 @@ fun DriveScreen(modifier: Modifier = Modifier) {
         Spacer(Modifier.height(10.dp))
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Sp.Xs),
         ) {
             ModeChip("Manual", mode == LidarMode.MANUAL, Modifier.weight(1f)) {
                 RobotService.setLidarMode(LidarMode.MANUAL)
@@ -94,7 +98,7 @@ fun DriveScreen(modifier: Modifier = Modifier) {
         Spacer(Modifier.height(8.dp))
         Surface(
             Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(Rd.S),
             color = when {
                 warn.buzzer -> DangerRed
                 warn.active -> DangerRed.copy(alpha = 0.25f)
@@ -114,7 +118,7 @@ fun DriveScreen(modifier: Modifier = Modifier) {
                                 bearing(warn.nearestAngleRad))
                         else -> "Clear ahead"
                     },
-                    fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                    fontSize = Ts.Body, fontWeight = FontWeight.Bold,
                     color = if (warn.buzzer) Color.White
                     else MaterialTheme.colorScheme.onSurface,
                 )
@@ -124,7 +128,7 @@ fun DriveScreen(modifier: Modifier = Modifier) {
                         if (t == null) "Nothing to follow"
                         else "Tracking %.2f m %s".format(
                             t.rangeM, bearing(t.angleRad)),
-                        fontSize = 12.sp,
+                        fontSize = Ts.Caption,
                         color = if (warn.buzzer) Color.White.copy(alpha = 0.9f)
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -132,7 +136,7 @@ fun DriveScreen(modifier: Modifier = Modifier) {
                 if (mode == LidarMode.AVOID && lidarState.avoidanceWhy.isNotEmpty()) {
                     Text(
                         lidarState.avoidanceWhy,
-                        fontSize = 11.sp,
+                        fontSize = Ts.Caption,
                         color = if (warn.buzzer) Color.White.copy(alpha = 0.9f)
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -147,7 +151,7 @@ fun DriveScreen(modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Buzzer", fontSize = 13.sp)
+            Text("Buzzer", fontSize = Ts.Body)
             Switch(
                 checked = RobotService.lidarCtl.buzzerEnabled,
                 onCheckedChange = { RobotService.lidarCtl.buzzerEnabled = it },
@@ -171,10 +175,10 @@ fun DriveScreen(modifier: Modifier = Modifier) {
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("Speed", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text("Speed", fontSize = Ts.Body, fontWeight = FontWeight.Medium)
             Text(
                 "${"%.2f".format(config.maxLinearMps * (0.15 + speedFrac * 0.85))} m/s",
-                fontSize = 13.sp,
+                fontSize = Ts.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -186,7 +190,7 @@ fun DriveScreen(modifier: Modifier = Modifier) {
         Spacer(Modifier.height(8.dp))
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(Sp.Sm),
         ) {
             SonarChip("Front", telemetry.sonarFrontM, Modifier.weight(1f))
             SonarChip("Left", telemetry.sonarLeftM, Modifier.weight(1f))
@@ -197,13 +201,13 @@ fun DriveScreen(modifier: Modifier = Modifier) {
         // Phase 8: dock controls (repo behaviour: save pose, back in).
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(Sp.Sm),
         ) {
             val dockPhase = RobotService.dockPhase
             OutlinedButton(
                 onClick = { RobotService.setDock(ctx) },
                 Modifier.weight(1f).height(46.dp),
-            ) { Text("⚓ Set dock here", fontSize = 13.sp) }
+            ) { Text("⚓ Set dock here", fontSize = Ts.Body) }
             Button(
                 onClick = { RobotService.goDock(ctx) },
                 Modifier.weight(1f).height(46.dp),
@@ -221,7 +225,7 @@ fun DriveScreen(modifier: Modifier = Modifier) {
                             "Docked ✓"
                         else -> "🏠 Go dock"
                     },
-                    fontSize = 13.sp,
+                    fontSize = Ts.Body,
                 )
             }
         }
@@ -238,7 +242,7 @@ fun DriveScreen(modifier: Modifier = Modifier) {
         ) {
             Text(
                 if (eStop) "CLEAR E-STOP" else "E-STOP",
-                fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                fontWeight = FontWeight.Bold, fontSize = Ts.Title,
             )
         }
     }
@@ -268,7 +272,7 @@ private fun ModeChip(label: String, selected: Boolean, modifier: Modifier,
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                label, fontSize = 13.sp,
+                label, fontSize = Ts.Body,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                 color = if (selected) Color.White
                 else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -282,7 +286,7 @@ private fun SonarChip(name: String, meters: Float, modifier: Modifier) {
     val blocked = meters in 0.01f..0.35f
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(Rd.M),
         color = (if (blocked) DangerRed else MaterialTheme.colorScheme
             .surfaceVariant).copy(alpha = 0.85f),
     ) {
@@ -290,11 +294,11 @@ private fun SonarChip(name: String, meters: Float, modifier: Modifier) {
             Modifier.padding(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(name, fontSize = 11.sp,
+            Text(name, fontSize = Ts.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 if (meters <= 0f) "—" else "%.2f m".format(meters),
-                fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                fontSize = Ts.Body, fontWeight = FontWeight.Bold,
                 color = if (blocked) Color.White
                 else MaterialTheme.colorScheme.onSurface,
             )

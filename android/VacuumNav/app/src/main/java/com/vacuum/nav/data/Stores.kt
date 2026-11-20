@@ -15,7 +15,8 @@ import java.io.File
 // ---------------------------------------------------------------- no-go zones
 /** Axis-aligned no-go rectangle in world metres. */
 data class NoGoZone(val id: Long, val x: Double, val y: Double,
-                    val w: Double, val h: Double)
+                    val w: Double, val h: Double,
+                    val name: String = "", val enabled: Boolean = true)
 
 object ZoneStore {
     private const val FILE = "nogo_zones.json"
@@ -24,7 +25,8 @@ object ZoneStore {
         (0 until root.length()).map { i ->
             val o = root.getJSONObject(i)
             NoGoZone(o.getLong("id"), o.getDouble("x"), o.getDouble("y"),
-                o.getDouble("w"), o.getDouble("h"))
+                o.getDouble("w"), o.getDouble("h"),
+                o.optString("name", ""), o.optBoolean("enabled", true))
         }
     }
 
@@ -34,6 +36,7 @@ object ZoneStore {
             arr.put(JSONObject().apply {
                 put("id", z.id); put("x", z.x); put("y", z.y)
                 put("w", z.w); put("h", z.h)
+                put("name", z.name); put("enabled", z.enabled)
             })
         }
         file(ctx).writeText(arr.toString())
