@@ -30,7 +30,7 @@
     { "id": "FINDING-004", "impact": "medium", "category": "anatomy", "tell": 27,
       "summary": "Manual '‹ Back' text buttons (x3) instead of a TopAppBar with navigation icon; no header owner on sub-screens", "status": "open" },
     { "id": "FINDING-005", "impact": "medium", "category": "states", "tell": 38,
-      "summary": "Link ERROR_LINK exists in code but no UI banner; loading is plain text with no skeleton; no standard empty/error treatment", "status": "open" },
+      "summary": "Link ERROR_LINK exists in code but no UI banner; loading is plain text with no skeleton; no standard empty/error treatment", "status": "fixed", "fixedIn": "Phase 3" },
     { "id": "FINDING-006", "impact": "medium", "category": "typography", "tell": null,
       "summary": "No type scale or spacing rhythm: raw sp values (11..32) and ad-hoc dp scattered per screen", "status": "fixed", "fixedIn": "Phase 1" },
     { "id": "FINDING-007", "impact": "medium", "category": "surfaces", "tell": 11,

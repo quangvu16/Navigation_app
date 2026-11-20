@@ -21,6 +21,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CardDefaults
 import androidx.compose.foundation.Image
 import androidx.compose.material.icons.filled.Add
@@ -98,6 +99,17 @@ fun HomeScreen(
                 (cfg.batteryFullV - cfg.batteryCriticalV) * 100)
                 .coerceIn(0.0, 100.0).toInt().toString() + "%"
         }
+    }
+
+    // Phase 3 of the redesign (FINDING-005): real loading state while the
+    // foreground service spins up the brain.
+    if (link == null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+            Spacer(Modifier.height(Sp.Md))
+            Text("Starting robot brain…", fontSize = Ts.Body)
+        }
+        return
     }
 
     Column(

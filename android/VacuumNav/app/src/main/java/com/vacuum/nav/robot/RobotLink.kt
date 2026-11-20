@@ -1,5 +1,6 @@
 package com.vacuum.nav.robot
 
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -51,6 +52,10 @@ interface RobotLink {
 
     /** Short human description for Diagnostics ("SIM · simulator", ...). */
     val description: String get() = this::class.simpleName ?: "link"
+
+    /** Link health - ERROR_LINK drives the app-wide banner. The simulator
+     *  never errors; UDP/BLE override with their live flow. */
+    val state: StateFlow<LinkState> get() = MutableStateFlow(LinkState.CLAIMED)
 
     /** Wheel speed targets in RPM (+ = forward). Zero on stop/e-stop paths. */
     fun setWheelRpm(rpmL: Float, rpmR: Float)

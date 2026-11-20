@@ -97,7 +97,7 @@ class BleRobotLink(
     override val scans: SharedFlow<Scan> = _scans.asSharedFlow()
 
     private val _state = MutableStateFlow(LinkState.DISCOVERING)
-    val state: StateFlow<LinkState> = _state.asStateFlow()
+    override val state: StateFlow<LinkState> = _state.asStateFlow()
 
     private val running = AtomicBoolean(true)
     private val txQueue = ConcurrentLinkedQueue<ByteArray>()
