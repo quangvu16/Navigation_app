@@ -118,16 +118,31 @@ object RunStats {
     private var lastX: Double? = null
     private var lastY: Double? = null
 
+    // Phase 8: per-run baselines so History records THIS run's deltas.
+    private var area0 = 0.0
+    private var active0 = 0.0
+    private var startWallMs = 0L
+
+    /** (areaDelta, activeSecondsDelta, startedAtWallMs) at stopRun. */
+    var onEnded: ((Double, Double, Long) -> Unit)? = null
+
     fun startRun() {
         if (!running) {
             running = true
             runs += 1
             lastX = null
             lastY = null
+            area0 = areaM2
+            active0 = activeSeconds
+            startWallMs = System.currentTimeMillis()
         }
     }
 
     fun stopRun() {
+        if (running) {
+            onEnded?.invoke(areaM2 - area0, activeSeconds - active0,
+                startWallMs)
+        }
         running = false
         lastX = null
         lastY = null

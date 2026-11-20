@@ -48,6 +48,8 @@ import com.vacuum.nav.ui.theme.RobotOrange
 fun HomeScreen(
     onEnter: () -> Unit,
     onOpenSchedules: () -> Unit,
+    onOpenMaps: () -> Unit,
+    onOpenHistory: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val link = RobotService.link
@@ -244,6 +246,31 @@ fun HomeScreen(
             RoutineChip(
                 "＋ Add",
                 "New routine",
+                Modifier.weight(1f),
+                onClick = onOpenSchedules,
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            RoutineChip(
+                "🗺 Maps",
+                "Floors: save / load",
+                Modifier.weight(1f),
+                onClick = onOpenMaps,
+            )
+            RoutineChip(
+                "🧾 History",
+                "Past runs",
+                Modifier.weight(1f),
+                onClick = onOpenHistory,
+            )
+            RoutineChip(
+                "⏰ Schedules",
+                "Timed cleans",
                 Modifier.weight(1f),
                 onClick = onOpenSchedules,
             )

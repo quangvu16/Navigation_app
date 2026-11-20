@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.asImageBitmap
+import com.vacuum.nav.data.MapStore
 import com.vacuum.nav.data.RunStats
 import com.vacuum.nav.data.ZoneStore
 import com.vacuum.nav.robot.RobotConfig
@@ -105,6 +106,7 @@ fun MapScreen(
             ?: remember { kotlinx.coroutines.flow.MutableStateFlow(
                 com.vacuum.nav.robot.NavUiState()) }).collectAsState()
         var navMessage by remember { mutableStateOf<String?>(null) }
+        var saveHint by remember { mutableStateOf<String?>(null) }
         val ctx = androidx.compose.ui.platform.LocalContext.current
         // Phase 7: Rooms tab runs segmentation (cached in C++) and tints
         // the room cells over the occupancy layer.
@@ -118,6 +120,11 @@ fun MapScreen(
             else null
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
+            // Live mapper output wins; a loaded floor map (MapStore) is the
+            // base layer until the mapper has built something of its own.
+            val baseImage = remember(mapSnap, MapStore.current) {
+                (mapSnap ?: MapStore.current)?.let(::buildGridImage)
+            }
             MapCanvas(
                 config = config,
                 scan = scan.value,
@@ -131,7 +138,7 @@ fun MapScreen(
                 zones = zones.value,
                 showGrid = showGrid,
                 iso = iso,
-                grid = roomsImage ?: gridImage,
+                grid = roomsImage ?: gridImage ?: baseImage,
                 targetPos = lidarState.target?.let {
                     RobotService.lidarCtl.targetWorld(
                         telemetry.pose.x.toDouble(),
@@ -154,6 +161,17 @@ fun MapScreen(
             ) {
                 RailButton("🚫", "Zones") { onOpenZones() }
                 RailButton("🕹", "Drive") { onOpenDrive() }
+                RailButton("💾", "Save") {
+                    val snap = mapSnap
+                    if (snap != null) {
+                        val n = MapStore.list(ctx)
+                            .maxOfOrNull { it.floor } ?: 0
+                        MapStore.save(ctx, "Floor ${n + 1}", n + 1, snap)
+                        saveHint = "Saved Floor ${n + 1}"
+                    } else {
+                        saveHint = "Map a bit first"
+                    }
+                }
                 RailButton(
                     if (RobotService.exploreActive) "🛑" else "🧭",
                     if (RobotService.exploreActive) "Stop" else "Explore",
@@ -174,6 +192,7 @@ fun MapScreen(
             if (mode == 2) ModeHint("Zones: draw on the Zones tab")
             // Phase 4: go-to status / rejection feedback.
             val navLabel = when {
+                saveHint != null -> saveHint
                 navMessage != null -> navMessage
                 navState.state == com.vacuum.nav.robot.NavState.REJECTED ->
                     "Invalid goal (obstacle)"
@@ -201,6 +220,12 @@ fun MapScreen(
                     delay(4000)
                     navMessage = null
                     RobotService.cancelGoTo()
+                }
+            }
+            LaunchedEffect(saveHint) {
+                if (saveHint != null) {
+                    delay(3000)
+                    saveHint = null
                 }
             }
         }

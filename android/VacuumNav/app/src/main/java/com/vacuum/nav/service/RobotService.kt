@@ -20,6 +20,8 @@ import com.vacuum.nav.lidar.LidarBehaviorController
 import com.vacuum.nav.lidar.LidarMode
 import com.vacuum.nav.data.DockPose
 import com.vacuum.nav.data.DockStore
+import com.vacuum.nav.data.HistoryStore
+import com.vacuum.nav.data.RunRecord
 import com.vacuum.nav.data.ZoneStore
 import com.vacuum.nav.robot.MapperEngine
 import com.vacuum.nav.robot.NavEngine
@@ -88,6 +90,19 @@ class RobotService : Service() {
             link = SimRobotLink(RobotConfig())
         }
         mapper = MapperEngine(RobotConfig())   // Phase 3 live mapping
+        // Phase 8: every finished run lands in History (prompt §6).
+        RunStats.onEnded = { areaDelta, activeDelta, startedAt ->
+            val ctx = applicationContext
+            HistoryStore.add(ctx, RunRecord(
+                id = System.nanoTime(),
+                startedAtMs = startedAt,
+                durationSec = activeDelta.toLong(),
+                areaM2 = areaDelta,
+                coveragePct = 0.0,   // filled when the Phase-7 tracker
+                                     // feeds the run loop
+                mode = "full",
+            ))
+        }
         nav = NavEngine(RobotConfig())         // Phase 4 go-to-goal
         watchScans()   // feeds lidarCtl + mapper + nav from the current link
 
