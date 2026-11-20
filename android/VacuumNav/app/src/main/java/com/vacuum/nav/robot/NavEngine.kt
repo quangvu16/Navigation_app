@@ -218,6 +218,21 @@ class NavEngine(private val config: RobotConfig) : AutoCloseable {
 
     private external fun nativeCoveragePath(handle: Long, roomId: Int): FloatArray
 
+    /** Phase 7 polish: merge room A into B (stable ids of survivors). */
+    @Volatile
+    var mergeVersion = 0
+        private set
+
+    fun mergeRooms(idA: Int, idB: Int): Boolean {
+        if (handle == 0L) return false
+        val ok = nativeMergeRooms(handle, idA, idB)
+        if (ok) mergeVersion++
+        return ok
+    }
+
+    private external fun nativeMergeRooms(handle: Long, idA: Int,
+                                          idB: Int): Boolean
+
     private external fun nativeCreate(configJson: String): Long
     private external fun nativeDestroy(handle: Long)
     private external fun nativeSetMap(handle: Long, snapshot: ByteArray): Boolean

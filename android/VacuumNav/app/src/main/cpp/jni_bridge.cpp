@@ -664,4 +664,55 @@ Java_com_vacuum_nav_robot_NavEngine_nativeCoveragePath(JNIEnv* env, jobject,
   return arr;
 }
 
+// Phase 7 polish: merge room A into room B (user edit; ids of surviving
+// rooms stay stable). Returns false when the segmentation is not ready.
+JNIEXPORT jboolean JNICALL
+Java_com_vacuum_nav_robot_NavEngine_nativeMergeRooms(JNIEnv*, jobject,
+                                                     jlong handle,
+                                                     jint idA, jint idB) {
+  NavHolder* n = fromNav(handle);
+  if (!n || idA == idB) return JNI_FALSE;
+  std::lock_guard<std::mutex> lock(n->mutex);
+  if (!n->hasMap) return JNI_FALSE;
+  if (!n->segValid) {
+    vacuum::RoomSegmenter seg;
+    n->segRooms = seg.segment(n->grid, n->segLabels);
+    n->segValid = true;
+  }
+  bool any = false;
+  for (auto& l : n->segLabels)
+    if (l == static_cast<int16_t>(idA)) {
+      l = static_cast<int16_t>(idB);
+      any = true;
+    }
+  if (!any) return JNI_FALSE;
+
+  // Recompute the room table from the merged labels.
+  const int w = n->grid.width(), h = n->grid.height();
+  std::vector<int> cells(4096, 0);
+  std::vector<double> sx(4096, 0.0), sy(4096, 0.0);
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x) {
+      const int16_t l = n->segLabels[static_cast<size_t>(y) * w + x];
+      if (l <= 0 || l >= 4096) continue;
+      cells[l]++;
+      sx[l] += x;
+      sy[l] += y;
+    }
+  n->segRooms.clear();
+  for (int id = 1; id < 4096; ++id) {
+    if (cells[id] == 0) continue;
+    vacuum::Room r;
+    r.id = id;
+    r.cells = cells[id];
+    r.areaM2 = r.cells * n->grid.resolution() * n->grid.resolution();
+    const int cx = static_cast<int>(sx[id] / cells[id]);
+    const int cy = static_cast<int>(sy[id] / cells[id]);
+    r.centroid = n->grid.cellCentre(n->grid.originX() + cx,
+                                    n->grid.originY() + cy);
+    n->segRooms.push_back(r);
+  }
+  return JNI_TRUE;
+}
+
 }  // extern "C"

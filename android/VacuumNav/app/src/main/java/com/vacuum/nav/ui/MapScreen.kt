@@ -20,6 +20,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -110,10 +111,11 @@ fun MapScreen(
         val ctx = androidx.compose.ui.platform.LocalContext.current
         // Phase 7: Rooms tab runs segmentation (cached in C++) and tints
         // the room cells over the occupancy layer.
-        val segResult = remember(mapSnap?.version, mode) {
+        val segResult = remember(mapSnap?.version, mode, RobotService.nav?.mergeVersion) {
             if (mode == 1) RobotService.nav?.segment() else null
         }
-        val roomsImage = remember(mapSnap?.version, mode) {
+        val roomsImage = remember(mapSnap?.version, mode,
+            RobotService.nav?.mergeVersion) {
             val snap = mapSnap
             if (mode == 1 && snap != null)
                 RobotService.nav?.segment()?.let { buildRoomsImage(snap, it) }
@@ -186,7 +188,10 @@ fun MapScreen(
                 if (rooms.isNullOrEmpty()) {
                     ModeHint("No rooms yet — map more of the space first")
                 } else {
-                    // Tap to select rooms for a targeted clean (§5/§8).
+                    // Tap to select rooms for a targeted clean (§5/§8);
+                    // stable ids carry user names (RoomNames).
+                    var renaming by remember { mutableStateOf<Int?>(null) }
+                    var roomName by remember { mutableStateOf("") }
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -207,7 +212,9 @@ fun MapScreen(
                                 else MaterialTheme.colorScheme.surfaceVariant,
                             ) {
                                 Text(
-                                    "R${r.id} · %.1f m²".format(r.areaM2),
+                                    com.vacuum.nav.data.RoomNames
+                                        .get(ctx, r.id) +
+                                        " · %.1f m²".format(r.areaM2),
                                     fontSize = 11.sp,
                                     color = if (selected) Color.White
                                     else MaterialTheme.colorScheme
@@ -217,6 +224,64 @@ fun MapScreen(
                                 )
                             }
                         }
+                    }
+                    // Rename / merge (stable-id edits, prompt §5).
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (RobotService.selectedRooms.size == 1) {
+                            TextButton(onClick = {
+                                val id = RobotService.selectedRooms.first()
+                                roomName = com.vacuum.nav.data.RoomNames
+                                    .get(ctx, id)
+                                renaming = id
+                            }) { Text("Rename", fontSize = 12.sp) }
+                        }
+                        if (RobotService.selectedRooms.size == 2) {
+                            TextButton(onClick = {
+                                val (a, b) = RobotService.selectedRooms
+                                    .toList()
+                                RobotService.nav?.mergeRooms(a, b)
+                                RobotService.selectedRooms = setOf(b)
+                                navMessage = "Merged rooms"
+                            }) { Text("Merge", fontSize = 12.sp) }
+                        }
+                        if (RobotService.selectedRooms.isNotEmpty()) {
+                            TextButton(onClick = {
+                                RobotService.selectedRooms = emptySet()
+                            }) { Text("Clear", fontSize = 12.sp) }
+                        }
+                    }
+                    if (renaming != null) {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { renaming = null },
+                            title = { Text("Rename room") },
+                            text = {
+                                androidx.compose.material3.OutlinedTextField(
+                                    value = roomName,
+                                    onValueChange = { roomName = it },
+                                    singleLine = true,
+                                    label = { Text("Name") },
+                                )
+                            },
+                            confirmButton = {
+                                androidx.compose.material3.TextButton(
+                                    onClick = {
+                                        renaming?.let {
+                                            com.vacuum.nav.data.RoomNames
+                                                .set(ctx, it, roomName)
+                                        }
+                                        renaming = null
+                                    },
+                                ) { Text("Save") }
+                            },
+                            dismissButton = {
+                                androidx.compose.material3.TextButton(
+                                    onClick = { renaming = null },
+                                ) { Text("Cancel") }
+                            },
+                        )
                     }
                 }
             }
