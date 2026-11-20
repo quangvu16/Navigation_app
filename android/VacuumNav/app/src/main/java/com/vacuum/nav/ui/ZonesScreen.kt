@@ -1,8 +1,6 @@
 package com.vacuum.nav.ui
 
-import com.vacuum.nav.ui.theme.Rd
-import com.vacuum.nav.ui.theme.Sp
-import com.vacuum.nav.ui.theme.Ts
+import com.vacuum.nav.ui.theme.*
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -48,7 +46,6 @@ import com.vacuum.nav.ui.theme.RobotOrange
 import kotlin.math.abs
 import kotlin.math.max
 
-private val HandleBlue = Color(0xFF2196F3)
 private const val COS30 = 0.8660254f
 private const val ISO_SCALE = 60f      // px per metre in the 3D editor
 private const val HANDLE_PX = 36f      // generous handle hit target
@@ -219,8 +216,8 @@ fun ZonesScreen(modifier: Modifier = Modifier) {
             val cy = size.height / 2f
 
             // Floor grid + the room (light reference-style background).
-            drawRect(Color(0xFFF4F6F8))
-            val gridColor = Color(0xFFE2E6EA)
+            drawRect(MapEditorBg)
+            val gridColor = MapGridLine
             for (i in -4..8) {
                 drawLine(gridColor,
                     isoToScreen(i * 0.5, -4.0, cx, cy),
@@ -229,12 +226,12 @@ fun ZonesScreen(modifier: Modifier = Modifier) {
                     isoToScreen(-4.0, i * 0.5, cx, cy),
                     isoToScreen(8.0, i * 0.5, cx, cy))
             }
-            drawPath(quadPath(0.1, 0.1, 3.9, 3.9, cx, cy), Color(0xFFB3E5FC))
+            drawPath(quadPath(0.1, 0.1, 3.9, 3.9, cx, cy), RoomTint)
 
             zones.forEach { z ->
                 val p = quadPath(z.x, z.y, z.x + z.w, z.y + z.h, cx, cy)
                 val on = z.enabled
-                drawPath(p, if (on) DangerRed.copy(alpha = 0.4f) else Color(0x66888888))
+                drawPath(p, if (on) DangerRed.copy(alpha = 0.4f) else MapEditorOutline)
                 drawPath(p, if (on) DangerRed else Color.Gray, style = Stroke(3f))
                 if (z.id == selectedId) {
                     for (k in 0..3) {

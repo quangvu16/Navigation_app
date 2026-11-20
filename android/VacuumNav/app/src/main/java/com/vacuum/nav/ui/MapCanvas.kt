@@ -26,7 +26,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import com.vacuum.nav.data.NoGoZone
 import com.vacuum.nav.robot.RobotConfig
 import com.vacuum.nav.robot.Scan
-import com.vacuum.nav.ui.theme.DangerRed
+import com.vacuum.nav.ui.theme.*
 import com.vacuum.nav.ui.theme.LidarCyan
 import com.vacuum.nav.ui.theme.MapUnknown
 import com.vacuum.nav.ui.theme.RobotOrange
@@ -173,10 +173,10 @@ fun MapCanvas(
             val tp = toScreen(tx, ty)
             val rp0 = toScreen(robotX.toDouble(), robotY.toDouble())
             drawLine(
-                color = Color(0xFF4CAF50).copy(alpha = 0.7f),
+                color = TargetGreen.copy(alpha = 0.7f),
                 start = rp0, end = tp, strokeWidth = 3f,
             )
-            drawCircle(color = Color(0xFF4CAF50), radius = 10f, center = tp)
+            drawCircle(color = TargetGreen, radius = 10f, center = tp)
             drawCircle(color = Color.White, radius = 10f, center = tp,
                 style = Stroke(width = 3f))
         }
@@ -204,7 +204,7 @@ fun MapCanvas(
                 size = Size(2 * r, r),
             )
             drawOval(
-                color = Color(0xFFB34700),
+                color = RobotOrange,
                 topLeft = Offset(top.x - r, top.y - r * 0.5f + 6f),
                 size = Size(2 * r, r),
             )

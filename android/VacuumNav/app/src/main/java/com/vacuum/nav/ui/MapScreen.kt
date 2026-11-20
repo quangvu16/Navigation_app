@@ -1,8 +1,6 @@
 package com.vacuum.nav.ui
 
-import com.vacuum.nav.ui.theme.Rd
-import com.vacuum.nav.ui.theme.Sp
-import com.vacuum.nav.ui.theme.Ts
+import com.vacuum.nav.ui.theme.*
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -46,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -377,7 +376,7 @@ fun MapScreen(
                 colors = ButtonDefaults.buttonColors(
                     containerColor =
                         if (autoClean || RobotService.coverageQueue.isNotEmpty())
-                            Color(0xFF9E9E9E)
+                            PauseGray
                         else RobotOrange,
                 ),
             ) {
@@ -421,9 +420,9 @@ private fun buildGridImage(s: com.vacuum.nav.robot.GridSnapshot): GridImage {
         val row = s.height - 1 - y
         for (x in 0 until s.width) {
             px[row * s.width + x] = when (s.cells[y * s.width + x].toInt()) {
-                1 -> 0xFF4A4D52.toInt()   // occupied (theme MapWall)
-                0 -> 0xFFE8E6E1.toInt()   // free (theme MapFree)
-                else -> 0x00000000        // unknown: transparent
+                1 -> MapWall.toArgb()   // occupied (theme MapWall)
+                0 -> MapFree.toArgb()   // free (theme MapFree)
+                else -> android.graphics.Color.TRANSPARENT        // unknown: transparent
             }
         }
     }
@@ -453,9 +452,9 @@ private fun buildRoomsImage(
         val row = snap.height - 1 - y
         for (x in 0 until snap.width) {
             px[row * snap.width + x] = when (snap.cells[y * snap.width + x].toInt()) {
-                1 -> 0xFF4A4D52.toInt()
-                0 -> 0xFFE8E6E1.toInt()
-                else -> 0x00000000
+                1 -> MapWall.toArgb()
+                0 -> MapFree.toArgb()
+                else -> android.graphics.Color.TRANSPARENT
             }
         }
     }

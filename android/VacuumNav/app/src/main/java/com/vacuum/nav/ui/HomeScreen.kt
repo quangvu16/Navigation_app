@@ -1,8 +1,6 @@
 package com.vacuum.nav.ui
 
-import com.vacuum.nav.ui.theme.Rd
-import com.vacuum.nav.ui.theme.Sp
-import com.vacuum.nav.ui.theme.Ts
+import com.vacuum.nav.ui.theme.*
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -179,7 +177,7 @@ fun HomeScreen(
                         color = when {
                             eStop -> MaterialTheme.colorScheme.error
                             autoClean -> RobotOrange
-                            else -> Color(0xFF7BE0B0)
+                            else -> Positive
                         }.copy(alpha = 0.15f),
                     ) {
                         Text(
@@ -193,7 +191,7 @@ fun HomeScreen(
                             color = when {
                                 eStop -> MaterialTheme.colorScheme.error
                                 autoClean -> RobotOrange
-                                else -> Color(0xFF7BE0B0)
+                                else -> Positive
                             },
                             modifier = Modifier.padding(
                                 horizontal = 10.dp, vertical = 4.dp),
@@ -207,7 +205,7 @@ fun HomeScreen(
                     Modifier.size(150.dp)
                         .background(
                             Brush.radialGradient(
-                                listOf(Color(0xFF37474F), Color(0xFF263238))
+                                listOf(HeroTop, HeroBottom)
                             ),
                             CircleShape,
                         ),

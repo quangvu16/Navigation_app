@@ -5,6 +5,9 @@ import android.content.Intent
 import android.graphics.Bitmap
 import androidx.core.content.FileProvider
 import com.vacuum.nav.robot.GridSnapshot
+import com.vacuum.nav.ui.theme.MapFree
+import com.vacuum.nav.ui.theme.MapWall
+import androidx.compose.ui.graphics.toArgb
 import org.json.JSONObject
 import java.io.File
 import java.util.Base64
@@ -103,8 +106,8 @@ object MapExport {
                 px[row * snap.width + x] = when (
                     snap.cells[y * snap.width + x].toInt()
                 ) {
-                    1 -> 0xFF4A4D52.toInt()
-                    0 -> 0xFFE8E6E1.toInt()
+                    1 -> MapWall.toArgb()
+                    0 -> MapFree.toArgb()
                     else -> 0xFFFFFFFF.toInt()
                 }
             }

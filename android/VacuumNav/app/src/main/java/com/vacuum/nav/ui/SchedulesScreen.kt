@@ -1,8 +1,6 @@
 package com.vacuum.nav.ui
 
-import com.vacuum.nav.ui.theme.Rd
-import com.vacuum.nav.ui.theme.Sp
-import com.vacuum.nav.ui.theme.Ts
+import com.vacuum.nav.ui.theme.*
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -195,7 +193,7 @@ private fun ScheduleRow(s: Schedule, onToggle: (Boolean) -> Unit,
                 checked = s.enabled,
                 onCheckedChange = onToggle,
                 colors = SwitchDefaults.colors(
-                    checkedTrackColor = Color(0xFF2BB3A0),
+                    checkedTrackColor = RobotOrange,
                     checkedThumbColor = Color.White,
                 ),
             )
