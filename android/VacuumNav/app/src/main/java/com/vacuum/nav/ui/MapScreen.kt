@@ -182,12 +182,43 @@ fun MapScreen(
                 RailButton("⬡", if (iso) "3D" else "2D") { iso = !iso }
             }
             if (mode == 1) {
-                val n = segResult?.rooms?.size ?: 0
-                ModeHint(
-                    if (n > 0) "$n room${if (n == 1) "" else "s"} segmented" +
-                        " · rename/merge UI in polish"
-                    else "No rooms yet — map more of the space first",
-                )
+                val rooms = segResult?.rooms
+                if (rooms.isNullOrEmpty()) {
+                    ModeHint("No rooms yet — map more of the space first")
+                } else {
+                    // Tap to select rooms for a targeted clean (§5/§8).
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        rooms.forEach { r ->
+                            val selected =
+                                r.id in RobotService.selectedRooms
+                            Surface(
+                                onClick = {
+                                    RobotService.selectedRooms =
+                                        if (selected) RobotService
+                                            .selectedRooms - r.id
+                                        else RobotService
+                                            .selectedRooms + r.id
+                                },
+                                shape = RoundedCornerShape(50),
+                                color = if (selected) RobotOrange
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                            ) {
+                                Text(
+                                    "R${r.id} · %.1f m²".format(r.areaM2),
+                                    fontSize = 11.sp,
+                                    color = if (selected) Color.White
+                                    else MaterialTheme.colorScheme
+                                        .onSurfaceVariant,
+                                    modifier = Modifier.padding(
+                                        horizontal = 10.dp, vertical = 6.dp),
+                                )
+                            }
+                        }
+                    }
+                }
             }
             if (mode == 2) ModeHint("Zones: draw on the Zones tab")
             // Phase 4: go-to status / rejection feedback.
@@ -249,18 +280,33 @@ fun MapScreen(
             Button(
                 onClick = {
                     if (eStop) RobotService.setEstop(false)
-                    if (autoClean) RobotService.stopCleaning()
-                    else RobotService.startCleaning()
+                    val running = autoClean ||
+                        RobotService.coverageQueue.isNotEmpty()
+                    if (running) {
+                        RobotService.stopCleaning()
+                    } else if (mode == 1) {
+                        // Rooms tab: targeted boustrophedon clean (§8).
+                        if (!RobotService.startRoomCleaning(ctx))
+                            navMessage = "Select rooms first"
+                    } else {
+                        RobotService.startCleaning()
+                    }
                 },
                 Modifier.weight(1f).height(48.dp),
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (autoClean) Color(0xFF9E9E9E)
-                    else RobotOrange,
+                    containerColor =
+                        if (autoClean || RobotService.coverageQueue.isNotEmpty())
+                            Color(0xFF9E9E9E)
+                        else RobotOrange,
                 ),
             ) {
-                Text(if (autoClean) "Pause" else "Start",
-                    fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (autoClean ||
+                        RobotService.coverageQueue.isNotEmpty()
+                    ) "Pause" else "Start",
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
             FilledTonalButton(
                 onClick = { RobotService.stopCleaning() },

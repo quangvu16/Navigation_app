@@ -209,6 +209,15 @@ class NavEngine(private val config: RobotConfig) : AutoCloseable {
 
     private external fun nativeSegment(handle: Long): ByteArray?
 
+    /** Phase 7/8: boustrophedon coverage waypoints for a room (flat x,y). */
+    fun coveragePath(roomId: Int): FloatArray? {
+        if (handle == 0L) return null
+        val p = nativeCoveragePath(handle, roomId)
+        return if (p == null || p.isEmpty()) null else p
+    }
+
+    private external fun nativeCoveragePath(handle: Long, roomId: Int): FloatArray
+
     private external fun nativeCreate(configJson: String): Long
     private external fun nativeDestroy(handle: Long)
     private external fun nativeSetMap(handle: Long, snapshot: ByteArray): Boolean

@@ -350,6 +350,7 @@ Java_com_vacuum_nav_robot_MapperEngine_nativeSnapshot(JNIEnv* env, jobject,
 // ---------------------------------------------------------------------------
 
 #include "vacuum/costmap.h"
+#include "vacuum/coverage.h"
 #include "vacuum/frontier.h"
 #include "vacuum/goto_controller.h"
 #include "vacuum/segmenter.h"
@@ -632,6 +633,35 @@ Java_com_vacuum_nav_robot_NavEngine_nativeSegment(JNIEnv* env, jobject,
   env->SetByteArrayRegion(out, 0, static_cast<jsize>(total),
                           reinterpret_cast<const jbyte*>(buf.data()));
   return out;
+}
+
+// Phase 7/8: boustrophedon coverage path for a room (flattened x,y pairs).
+JNIEXPORT jfloatArray JNICALL
+Java_com_vacuum_nav_robot_NavEngine_nativeCoveragePath(JNIEnv* env, jobject,
+                                                       jlong handle,
+                                                       jint roomId) {
+  NavHolder* n = fromNav(handle);
+  if (!n) return env->NewFloatArray(0);
+  std::lock_guard<std::mutex> lock(n->mutex);
+  if (!n->hasMap) return env->NewFloatArray(0);
+  if (!n->segValid) {
+    vacuum::RoomSegmenter seg;
+    n->segRooms = seg.segment(n->grid, n->segLabels);
+    n->segValid = true;
+  }
+  vacuum::CoverageParams cp;
+  cp.robotRadiusM = n->cfg.robotRadiusM;
+  vacuum::CoveragePlanner planner(cp);
+  const auto path = planner.plan(n->grid, n->segLabels, roomId);
+  std::vector<jfloat> flat(path.size() * 2);
+  for (size_t i = 0; i < path.size(); ++i) {
+    flat[i * 2] = static_cast<jfloat>(path[i].x);
+    flat[i * 2 + 1] = static_cast<jfloat>(path[i].y);
+  }
+  jfloatArray arr = env->NewFloatArray(static_cast<jsize>(flat.size()));
+  env->SetFloatArrayRegion(arr, 0, static_cast<jsize>(flat.size()),
+                           flat.data());
+  return arr;
 }
 
 }  // extern "C"

@@ -151,6 +151,20 @@ class RobotService : Service() {
                         }
                     }
 
+                    // Phase 8: coverage queue - pull the next waypoint
+                    // whenever GoTo is idle (and nothing else owns it).
+                    if (coverageQueue.isNotEmpty() && !goToActive &&
+                        !eStop && !exploreActive &&
+                        dockPhase == DockPhase.NONE
+                    ) {
+                        val wp = coverageQueue.first()
+                        if (!startGoTo(applicationContext, wp.first,
+                                wp.second, keepRun = true)
+                        ) {
+                            coverageQueue.removeFirst()   // skip bad waypoint
+                        }
+                    }
+
                     val cmd: Pair<Double, Double> = when {
                         eStop -> 0.0 to 0.0
                         // Phase 8: reverse-in final leg of docking.
@@ -174,6 +188,10 @@ class RobotService : Service() {
                                     st == NavState.REJECTED
                                 ) {
                                     goToActive = false
+                                    // Coverage queue: this waypoint is done
+                                    // (or unreachable - skip it either way).
+                                    if (coverageQueue.isNotEmpty())
+                                        coverageQueue.removeFirst()
                                     notifyApproachEnded(
                                         st == NavState.REACHED)
                                     0.0 to 0.0
@@ -360,6 +378,15 @@ class RobotService : Service() {
         var exploreActive = false
             private set
 
+        // ---- Phase 8: room-targeted cleaning -----------------------------
+        /** Rooms selected on the Rooms tab (stable segmenter ids). */
+        @Volatile
+        var selectedRooms = setOf<Int>()
+
+        /** Remaining coverage waypoints (flattened pairs), consumed by the
+         *  control thread through GoTo, one goal at a time. */
+        val coverageQueue = ArrayDeque<Pair<Double, Double>>()
+
         // ---- Phase 8: docking --------------------------------------------
         /** NONE -> APPROACH (GoTo to0.6 m in front) -> FINAL (reverse in). */
         enum class DockPhase { NONE, APPROACH, FINAL, DOCKED }
@@ -498,7 +525,8 @@ class RobotService : Service() {
          * virtual wall is rejected with a clear message, prompt §7).
          * Returns false when the goal is inside an obstacle/keepout.
          */
-        fun startGoTo(context: Context, x: Double, y: Double): Boolean {
+        fun startGoTo(context: Context, x: Double, y: Double,
+                      keepRun: Boolean = false): Boolean {
             val n = nav ?: return false
             val zones = ZoneStore.load(context)
             val rects = FloatArray(zones.size * 4)
@@ -512,13 +540,39 @@ class RobotService : Service() {
             val ok = n.setGoal(x, y)
             if (ok) {
                 autoClean = false
-                RunStats.stopRun()
+                if (!keepRun) RunStats.stopRun()
                 manualV = 0.0
                 manualW = 0.0
                 lidarCtl.setMode(LidarMode.MANUAL)
                 goToActive = true
             }
             return ok
+        }
+
+        /**
+         * Phase 8: clean the selected rooms along their boustrophedon
+         * paths (prompt §5/§8): queue every waypoint, the control thread
+         * walks it with GoTo one goal at a time. Returns false when no
+         * rooms are selected or none yield a path.
+         */
+        fun startRoomCleaning(context: Context): Boolean {
+            val n = nav ?: return false
+            coverageQueue.clear()
+            for (id in selectedRooms) {
+                val path = n.coveragePath(id) ?: continue
+                var i = 0
+                while (i + 1 < path.size) {
+                    coverageQueue.add(
+                        path[i].toDouble() to path[i + 1].toDouble())
+                    i += 2
+                }
+            }
+            if (coverageQueue.isEmpty()) return false
+            eStop = false
+            autoClean = false
+            lidarCtl.setMode(LidarMode.MANUAL)
+            RunStats.startRun()
+            return true
         }
 
         fun cancelGoTo() {
@@ -563,6 +617,7 @@ class RobotService : Service() {
         fun stopCleaning() {
             autoClean = false
             goToActive = false
+            coverageQueue.clear()
             nav?.cancel()
             RunStats.stopRun()
             link?.setWheelRpm(0f, 0f)
