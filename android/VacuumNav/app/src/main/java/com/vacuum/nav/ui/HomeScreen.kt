@@ -216,7 +216,13 @@ fun HomeScreen(
                             when {
                                 eStop -> "E-STOP"
                                 autoClean -> "CLEANING"
-                                else -> "SIM · IDLE"
+                                // Reflect the real transport (FINDING-012):
+                                // the chip above already resolves linkType.
+                                else -> when (linkType) {
+                                    Transport.SIM -> "SIM · IDLE"
+                                    Transport.UDP -> "WI-FI · IDLE"
+                                    Transport.BLE -> "BLE · IDLE"
+                                }
                             },
                             fontSize = Ts.Caption,
                             fontWeight = FontWeight.Bold,
