@@ -37,6 +37,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -56,6 +57,13 @@ class RobotService : Service() {
     private var tone: ToneGenerator? = null
     private var scanJob: kotlinx.coroutines.Job? = null
     private var lastNavMapVersion = -1
+    private var telemetryJob: kotlinx.coroutines.Job? = null
+
+    // Diagnostics rates: cumulative counters, zeroed by the1 Hz ticker.
+    @Volatile private var scanCount = 0L
+    @Volatile private var telemCount = 0L
+    @Volatile private var lastScanAt = 0L
+    @Volatile private var lastTelemAt = 0L
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -90,6 +98,24 @@ class RobotService : Service() {
             link = SimRobotLink(RobotConfig())
         }
         mapper = MapperEngine(RobotConfig())   // Phase 3 live mapping
+        // Diagnostics: publish link rates once a second (prompt §6).
+        serviceScope.launch {
+            while (alive) {
+                kotlinx.coroutines.delay(1000)
+                val now = System.currentTimeMillis()
+                val s = scanCount; val t = telemCount
+                scanCount = 0; telemCount = 0
+                _linkStats.value = LinkStats(
+                    transport = link?.description ?: "none",
+                    scanHz = s,
+                    telemHz = t,
+                    lastScanAgeMs = if (lastScanAt == 0L) -1
+                        else now - lastScanAt,
+                    lastTelemAgeMs = if (lastTelemAt == 0L) -1
+                        else now - lastTelemAt,
+                )
+            }
+        }
         // Phase 8: every finished run lands in History (prompt §6).
         RunStats.onEnded = { areaDelta, activeDelta, startedAt ->
             val ctx = applicationContext
@@ -255,9 +281,18 @@ class RobotService : Service() {
 
     private fun watchScans() {
         scanJob?.cancel()
+        telemetryJob?.cancel()
         val l = link ?: return
+        telemetryJob = serviceScope.launch {
+            l.telemetry.collect {
+                telemCount++
+                lastTelemAt = System.currentTimeMillis()
+            }
+        }
         scanJob = serviceScope.launch {
             l.scans.collect { scan ->
+                scanCount++
+                lastScanAt = System.currentTimeMillis()
                 lidarCtl.onScan(scan)
                 // Phase 3: feed the mapper with the pose guess (sim truth
                 // today; EKF output once Phase 2's filter is on-device).
@@ -362,6 +397,20 @@ class RobotService : Service() {
         @Volatile
         var mapper: MapperEngine? = null
             private set
+
+        /** Diagnostics link statistics (published at1 Hz). */
+        data class LinkStats(
+            val transport: String = "none",
+            val scanHz: Long = 0,
+            val telemHz: Long = 0,
+            val lastScanAgeMs: Long = -1,
+            val lastTelemAgeMs: Long = -1,
+        )
+
+        private val _linkStats = kotlinx.coroutines.flow.MutableStateFlow(
+            LinkStats())
+        val linkStats: kotlinx.coroutines.flow.StateFlow<LinkStats> =
+            _linkStats.asStateFlow()
 
         /** Phase 4 go-to-goal engine (A* + RPP + recovery). */
         @Volatile

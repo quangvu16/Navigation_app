@@ -49,6 +49,9 @@ interface RobotLink {
     val telemetry: StateFlow<Telemetry>
     val scans: SharedFlow<Scan>
 
+    /** Short human description for Diagnostics ("SIM · simulator", ...). */
+    val description: String get() = this::class.simpleName ?: "link"
+
     /** Wheel speed targets in RPM (+ = forward). Zero on stop/e-stop paths. */
     fun setWheelRpm(rpmL: Float, rpmR: Float)
 

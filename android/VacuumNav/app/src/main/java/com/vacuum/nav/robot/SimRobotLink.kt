@@ -19,6 +19,8 @@ class SimRobotLink(
     private val config: RobotConfig = RobotConfig(),
     seed: Long = 1L,
 ) : RobotLink {
+    override val description: String get() = "SIM · simulator"
+
 
     private val engine = NativeEngine(config.toJson(), null, 0, 0, 0.0, 0.0, 0.0, seed)
 

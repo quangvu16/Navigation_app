@@ -34,6 +34,8 @@ class UdpRobotLink(
     private val boardHost: String,
     private val takeover: Boolean = false,
 ) : RobotLink {
+    override val description: String get() = "UDP · $boardHost"
+
 
     private val _telemetry = MutableStateFlow(Telemetry())
     override val telemetry: StateFlow<Telemetry> = _telemetry.asStateFlow()

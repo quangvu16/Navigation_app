@@ -21,7 +21,8 @@ import androidx.compose.ui.Modifier
 @Composable
 fun AppNav() {
     var tab by rememberSaveable { mutableStateOf("home") }
-    var sub by rememberSaveable { mutableStateOf("") }   // "" | "maps" | "history"
+    // "" | "maps" | "history" | "diagnostics"
+    var sub by rememberSaveable { mutableStateOf("") }
 
     Scaffold(
         bottomBar = {
@@ -66,11 +67,16 @@ fun AppNav() {
                 onBack = { sub = "" },
                 modifier = content,
             )
+            sub == "diagnostics" -> DiagnosticsScreen(
+                onBack = { sub = "" },
+                modifier = content,
+            )
             tab == "home" -> HomeScreen(
                 onEnter = { tab = "map" },
                 onOpenSchedules = { tab = "schedule" },
                 onOpenMaps = { sub = "maps" },
                 onOpenHistory = { sub = "history" },
+                onOpenDiagnostics = { sub = "diagnostics" },
                 modifier = content,
             )
             tab == "map" -> MapScreen(

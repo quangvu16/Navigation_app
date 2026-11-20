@@ -50,6 +50,7 @@ fun HomeScreen(
     onOpenSchedules: () -> Unit,
     onOpenMaps: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val link = RobotService.link
@@ -110,7 +111,7 @@ fun HomeScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
-                TextButton(onClick = { showAbout = true }) { Text("⚙") }
+                TextButton(onClick = onOpenDiagnostics) { Text("⚙") }
             }
         }
         Spacer(Modifier.height(4.dp))
@@ -285,9 +286,6 @@ fun HomeScreen(
         )
     }
 
-    if (showAbout) {
-        AboutDialog(onDismiss = { showAbout = false })
-    }
     if (showConnect) {
         ConnectDialog(onDismiss = {
             showConnect = false

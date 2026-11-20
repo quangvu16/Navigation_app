@@ -42,6 +42,8 @@ class BleRobotLink(
     private val config: RobotConfig,
     private val takeover: Boolean = false,
 ) : RobotLink {
+    override val description: String get() = "BLE · " + deviceAddress.ifEmpty { "connecting…" }
+
 
     companion object {
         // FriendBot's UUIDs (firmware/ble_link.h).
