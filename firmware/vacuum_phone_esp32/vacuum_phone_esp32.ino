@@ -82,7 +82,9 @@ static void wifiBegin() {
   Serial.println("WiFi mode: AP_ONLY (no home Wi-Fi)");
 #else
   WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  // Runtime credentials (wifi_cfg.h): NVS if the app provisioned a network,
+  // else the compile-time secrets.h pair.
+  WiFi.begin(wifiCfgSsid(), wifiCfgPass());
   sta_begin_ms = millis();
   Serial.printf("WiFi mode: %s, joining \"%s\"\n",
 #if ROBOT_WIFI_MODE == WIFI_MODE_STA_FALLBACK
@@ -90,7 +92,7 @@ static void wifiBegin() {
 #else
                 "STA_ONLY",
 #endif
-                WIFI_SSID);
+                wifiCfgSsid());
 #endif
   wifi_retry_ms = millis();
 }
@@ -123,6 +125,19 @@ static void mdnsUp() {
 }
 
 static void wifiLoop() {
+  // WFC1 provisioning (wifi_cfg.h): once the100 ms ack-grace elapsed,
+  // switch the STA to the new network. The up/down edge logic below then
+  // re-runs mDNS + the lidar sender hookup on the new link.
+  if (wifiCfgApplyPending()) {
+    Serial.printf("WiFi: switching to \"%s\"\n", wifiCfgSsid());
+    WiFi.disconnect();
+    WiFi.begin(wifiCfgSsid(), wifiCfgPass());
+    sta_begin_ms = millis();
+    wifi_retry_ms = millis();
+    MDNS.end();            // force a clean mDNS re-announce on the new net
+    net_up_before = false; // treat the next up as a fresh link-up edge
+  }
+
   const bool sta_connected = (WiFi.status() == WL_CONNECTED);
 
 #if ROBOT_WIFI_MODE == WIFI_MODE_STA_FALLBACK
@@ -137,8 +152,8 @@ static void wifiLoop() {
   // Retries: keep trying the STA (even while the AP is up) so a router that
   // was still booting at power-on does not strand the board.
   if (!sta_connected && millis() - wifi_retry_ms >= WIFI_RETRY_MS) {
-    Serial.printf("WiFi \"%s\" still down, retrying\n", WIFI_SSID);
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    Serial.printf("WiFi \"%s\" still down, retrying\n", wifiCfgSsid());
+    WiFi.begin(wifiCfgSsid(), wifiCfgPass());
     wifi_retry_ms = millis();
   }
 
@@ -175,6 +190,7 @@ void setup() {
   xTaskCreatePinnedToCore(hoverboardTask, "hover", 4096, NULL, 3, NULL, 0);
   webDriveBegin();   // core 1, below loop() in importance
 
+  wifiCfgBegin();    // NVS credentials before the first WiFi.begin()
   wifiBegin();
 }
 

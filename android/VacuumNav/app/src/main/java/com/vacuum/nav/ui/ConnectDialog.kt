@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -63,6 +64,9 @@ fun ConnectDialog(onDismiss: () -> Unit) {
         mutableStateOf(emptyList<android.bluetooth.le.ScanResult>())
     }
     var scanning by remember { mutableStateOf(false) }
+    // Robot-side Wi-Fi provisioning (WFC1) - works over UDP or BLE links.
+    var showWifi by remember { mutableStateOf(false) }
+    val realLink = transportOf(RobotService.link) != Transport.SIM
 
     val blePermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -85,6 +89,10 @@ fun ConnectDialog(onDismiss: () -> Unit) {
         scanning = true
         if (needed.isEmpty()) startBleScan { bleDevices = it; scanning = false }
         else blePermLauncher.launch(needed.toTypedArray())
+    }
+
+    if (showWifi) {
+        WifiSettingsDialog(onDismiss = { showWifi = false })
     }
 
     AlertDialog(
@@ -168,6 +176,33 @@ fun ConnectDialog(onDismiss: () -> Unit) {
                             }
                         }
                     }
+                }
+
+                // ---- robot-side Wi-Fi (WFC1 provisioning) --------------
+                Spacer(Modifier.height(12.dp))
+                androidx.compose.material3.HorizontalDivider()
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = androidx.compose.foundation.layout
+                        .Arrangement.SpaceBetween,
+                    verticalAlignment = androidx.compose.ui.Alignment
+                        .CenterVertically,
+                ) {
+                    androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                        Text("Robot Wi-Fi network", fontSize = Ts.Body,
+                            fontWeight = FontWeight.SemiBold)
+                        Text(
+                            if (realLink) "Scan and save a network on the robot"
+                            else "Connect to the robot first, then pick a network",
+                            fontSize = Ts.Caption,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    TextButton(
+                        onClick = { showWifi = true },
+                        enabled = realLink,
+                    ) { Text("Choose...") }
                 }
             }
         },

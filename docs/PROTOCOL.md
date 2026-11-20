@@ -322,6 +322,99 @@ Wheels go to zero on release.
 
 ---
 
+### 3.9 WFC1 / WFCA — Wi-Fi provisioning (runtime, NVS-backed)
+
+Added so the robot can join **any** infrastructure network ("public Wi-Fi")
+without a reflash: `secrets.h` stays the compile-time default, WFC1
+overrides it in NVS (`Preferences` namespace `vacuum`). Both datagrams
+travel over UDP **and** BLE (§1.1) — you can configure the network before
+the board has ever joined one.
+
+**WFC1** — phone → board, 9901 or BLE RX. Owner-gated like HBC2 (claim
+first). Max 103 B.
+
+| Offset | Size | Field | Type |
+|--------|------|-------|------|
+| 0 | 4 | magic | ASCII `"WFC1"` |
+| 4 | 1 | flags | u8 | bit0 = clear (revert to `secrets.h`) |
+| 5 | 1 | ssid_len | u8 | 0..32 (must be ≥1 unless clearing) |
+| 6 | 1 | pass_len | u8 | 0..64 (0 = open network) |
+| 7 | ssid_len | ssid | UTF-8 | |
+| 7+ssid_len | pass_len | pass | bytes | |
+
+**WFCA** — board → requester (immediate, before the switch happens).
+5 B.
+
+| Offset | Size | Field | Type |
+|--------|------|-------|------|
+| 0 | 4 | magic | ASCII `"WFCA"` |
+| 4 | 1 | status | u8 | 0 saved+reconnecting · 1 bad length · 2 not owner · 3 unused · 4 AP-only build |
+
+Sequence: WFCA goes out first; ≥100 ms later the board saves to NVS,
+disconnects, and joins the new network (the 100 ms grace keeps the ack on
+the wire before `WiFi.disconnect()`). In `STA_FALLBACK` mode the soft-AP
+stays up, so a phone that was talking over the board's own AP keeps its
+link while the board also joins the infrastructure network; if the join
+fails within `WIFI_FALLBACK_MS` the AP fallback still rescues
+provisioning.
+
+---
+
+### 3.10 WFO1 / WFOA / WFOB — firmware update by URL
+
+Pull-based OTA for deployments where pushing (`tools/ota_upload.sh`,
+ArduinoOTA) is impractical: the board downloads an `.ino.bin` from a URL
+**it** can reach. Runs on core 1 in `loop()` with the same safety contract
+as ArduinoOTA — password on arrival, robot must stand still, wheels held
+at zero (`ota_active`) from accept to reboot. A failed download keeps the
+old firmware running.
+
+**WFO1** — phone → board, 9901 or BLE RX. Owner-gated. Max 270 B.
+
+| Offset | Size | Field | Type |
+|--------|------|-------|------|
+| 0 | 4 | magic | ASCII `"WFO1"` |
+| 4 | 1 | url_len | u8 | 8..200 (`http://` or `https://`) |
+| 5 | 1 | pass_len | u8 | 0..64 = `OTA_PASSWORD` |
+| 6 | url_len | url | ASCII | |
+| 6+url_len | pass_len | pass | bytes | |
+
+**WFOA** — board → requester, immediate accept/reject. 5 B.
+
+| Offset | Size | Field | Type |
+|--------|------|-------|------|
+| 0 | 4 | magic | ASCII `"WFOA"` |
+| 4 | 1 | status | u8 | see table |
+
+| status | meaning |
+|--------|---------|
+| 0 | accepted — download starts when the robot is still |
+| 1 | denied — not the owner |
+| 2 | wrong OTA password (or OTA disabled) |
+| 3 | robot moving — stop it first |
+| 4 | bad length / URL scheme |
+| 5 | OTA disabled at build (`OTA_ENABLED=0` / empty password) |
+| 7 | busy — an update is already staged or running |
+
+**WFOB** — board → owner, final result (6 B; sent asynchronously, after
+the download attempt, to the owner's original endpoint).
+
+| Offset | Size | Field | Type |
+|--------|------|-------|------|
+| 0 | 4 | magic | ASCII `"WFOB"` |
+| 4 | 1 | status | u8 | 0 flashed+rebooting · 1 download/write failed · 2 no update at URL |
+| 5 | 1 | detail | u8 | `HTTPUpdate` error code (0 for ok/no-update) |
+
+On status 0 the board flushes the datagram (300 ms) and reboots; the app
+sees the link drop and re-claims after the reboot. If the lease expired
+mid-download, WFOB has nobody to reach and is skipped (the reboot or the
+link state still tells the story). `https://` URLs use
+`NetworkClientSecure.setInsecure()` — encryption without CA pinning; trust
+comes from the owner lease + OTA password, documented in
+`docs/ASSUMPTIONS.md`.
+
+---
+
 ## 4. Decoder requirements (app side)
 
 - Kotlin decoders in the app + unit tests **built from captured packets**
@@ -349,3 +442,8 @@ Wheels go to zero on release.
 | PNG1 | phone → board | 12 B |
 | PNG2 | board → phone | 20 B |
 | BYE1 | board → phone | 5 B |
+| WFC1 | phone → board | 7 + ssid_len + pass_len (≤ 103 B) |
+| WFCA | board → phone | 5 B |
+| WFO1 | phone → board | 6 + url_len + pass_len (≤ 270 B) |
+| WFOA | board → phone | 5 B |
+| WFOB | board → phone | 6 B |

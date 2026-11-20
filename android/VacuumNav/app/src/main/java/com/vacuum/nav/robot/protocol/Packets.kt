@@ -250,7 +250,72 @@ object Packets {
         return Bye(b[4].toInt() and 0xFF)
     }
 
+    // ---- Wi-Fi provisioning / OTA replies (docs/PROTOCOL.md §3.9/§3.10) ----
+
+    /** WFCA status (WFC1 reply): 0 ok, 1 bad length, 2 not owner, 4 AP-only. */
+    data class Wfca(val status: Int) {
+        val ok get() = status == 0
+    }
+
+    fun decodeWfca(b: ByteArray): Wfca? {
+        if (b.size < 5 || String(b, 0, 4, Charsets.US_ASCII) != "WFCA") return null
+        return Wfca(b[4].toInt() and 0xFF)
+    }
+
+    /** WFOA status: 0 accepted, 1 not owner, 2 bad password, 3 moving,
+     *  4 bad url, 5 ota disabled, 7 busy. */
+    data class Wfoa(val status: Int) {
+        val accepted get() = status == 0
+    }
+
+    fun decodeWfoa(b: ByteArray): Wfoa? {
+        if (b.size < 5 || String(b, 0, 4, Charsets.US_ASCII) != "WFOA") return null
+        return Wfoa(b[4].toInt() and 0xFF)
+    }
+
+    /** WFOB final result: 0 flashed+rebooting, 1 download/write failed,
+     *  2 no update at URL; detail = HTTPUpdate error code. */
+    data class Wfob(val status: Int, val detail: Int) {
+        val ok get() = status == 0
+    }
+
+    fun decodeWfob(b: ByteArray): Wfob? {
+        if (b.size < 6 || String(b, 0, 4, Charsets.US_ASCII) != "WFOB") return null
+        return Wfob(b[4].toInt() and 0xFF, b[5].toInt() and 0xFF)
+    }
+
     // ---- builders (phone -> board) ----
+
+    /** WFC1: stage SSID+password on the board (clear = empty ssid). */
+    fun buildWfc1(ssid: String, pass: String, clear: Boolean = false): ByteArray {
+        val s = if (clear) ByteArray(0) else ssid.toByteArray(Charsets.UTF_8)
+            .also { require(it.size <= 32) { "ssid too long" } }
+        val p = if (clear) ByteArray(0) else pass.toByteArray(Charsets.UTF_8)
+            .also { require(it.size <= 64) { "password too long" } }
+        return ByteBufferLE.build(7 + s.size + p.size) {
+            ascii("WFC1")
+            u8(if (clear) 0x01 else 0)
+            u8(s.size)
+            u8(p.size)
+            write(s)
+            write(p)
+        }
+    }
+
+    /** WFO1: pull-update the board from url (password = OTA_PASSWORD). */
+    fun buildWfo1(url: String, otaPass: String): ByteArray {
+        val u = url.toByteArray(Charsets.US_ASCII)
+            .also { require(it.size in 8..200) { "bad url length" } }
+        val p = otaPass.toByteArray(Charsets.UTF_8)
+            .also { require(it.size <= 64) { "password too long" } }
+        return ByteBufferLE.build(6 + u.size + p.size) {
+            ascii("WFO1")
+            u8(u.size)
+            u8(p.size)
+            write(u)
+            write(p)
+        }
+    }
 
     fun buildHelo(proto: Int, scanPort: Int, telemPort: Int, takeover: Boolean,
                   session: Long): ByteArray =
@@ -292,6 +357,9 @@ object Packets {
 
     private fun java.io.ByteArrayOutputStream.ascii(s: String) =
         write(s.toByteArray(Charsets.US_ASCII))
+
+    private fun java.io.ByteArrayOutputStream.u8(v: Int) =
+        write(v and 0xFF)
 
     private fun java.io.ByteArrayOutputStream.u16(v: Int) {
         write(v and 0xFF)

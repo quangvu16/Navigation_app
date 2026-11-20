@@ -126,6 +126,9 @@ static const uint32_t SERIAL_MONITOR_BAUD = 115200;
 #ifndef OTA_PASSWORD
 #define OTA_PASSWORD ""
 #endif
+// Runtime override (WFC1 provisioning, docs/PROTOCOL.md §3.9): NVS-backed
+// SSID/pass chosen from the app; falls back to the secrets.h pair above.
+#include "wifi_cfg.h"
 
 #define ROBOT_HOSTNAME "hoverboard"
 

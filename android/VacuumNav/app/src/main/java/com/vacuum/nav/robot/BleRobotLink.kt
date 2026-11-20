@@ -102,6 +102,11 @@ class BleRobotLink(
     private val running = AtomicBoolean(true)
     private val txQueue = ConcurrentLinkedQueue<ByteArray>()
 
+    // Admin channel (WFC1/WFO1 out, WFCA/WFOA/WFOB in) - same contract as
+    // UdpRobotLink; GATT writes are already datagram-framed.
+    private val _adminReplies = MutableSharedFlow<ByteArray>(extraBufferCapacity = 8)
+    override val adminReplies: SharedFlow<ByteArray> = _adminReplies.asSharedFlow()
+
     @Volatile private var gatt: BluetoothGatt? = null
     @Volatile private var rxChar: BluetoothGattCharacteristic? = null
     @Volatile private var rpmL = 0f
@@ -217,8 +222,9 @@ class BleRobotLink(
     @Volatile
     var deviceAddress: String = ""
 
-    private fun send(bytes: ByteArray) {
+    override fun send(bytes: ByteArray): Boolean {
         txQueue.add(bytes)
+        return true
     }
 
     // ------------------------------------------------------------ frames
@@ -290,6 +296,8 @@ class BleRobotLink(
                 claimed = false
                 _state.value = LinkState.DISCOVERING
             }
+            "WFCA", "WFOA", "WFOB" ->
+                _adminReplies.tryEmit(d)   // settings UI
             else -> Unit   // PNG2 etc: consumed by Diagnostics later
         }
     }

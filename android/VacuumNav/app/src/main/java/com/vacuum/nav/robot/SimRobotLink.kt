@@ -30,6 +30,10 @@ class SimRobotLink(
     private val _scans = MutableSharedFlow<Scan>(replay = 1, extraBufferCapacity = 4)
     override val scans: SharedFlow<Scan> = _scans.asSharedFlow()
 
+    // No admin channel on the simulator: WFC1/WFO1 have no board to talk to.
+    override val adminReplies: SharedFlow<ByteArray> =
+        MutableSharedFlow(extraBufferCapacity = 4)
+
     private val running = AtomicBoolean(true)
     private val thread = Thread(::loop, "sim-robot-link").apply {
         isDaemon = true

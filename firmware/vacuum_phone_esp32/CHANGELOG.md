@@ -5,7 +5,43 @@ New sketch for the **phone brain** (no ROS, no PC). Derived from
 ROS setup); the link layer was rewritten per prompt §4 and
 `docs/PROTOCOL.md`.
 
-## 0.1.0 — protocol v2 (this release)
+## 0.2.0 — public-Wi-Fi provisioning + URL OTA (this release)
+
+Two new owner-gated datagrams on **both** transports (UDP + BLE), byte
+tables in `docs/PROTOCOL.md` §3.9/§3.10:
+
+- **WFC1/WFCA — runtime Wi-Fi provisioning** (new `wifi_cfg.h`): the app
+  picks any infrastructure network; credentials are stored in NVS
+  (`Preferences` namespace `vacuum`, keys `ssid`/`pass`) and survive
+  reboots/OTA. `secrets.h` stays the compile-time default and the result
+  of clearing (WFC1 flags bit0). Sequence: WFCA replies first, the switch
+  applies ≥100 ms later so the ack outlives `WiFi.disconnect()`; in
+  STA_FALLBACK the soft-AP stays up so an existing AP-side or BLE link
+  survives the network change. `ph_rx_buf` grew 64 → 320 B for the larger
+  receives (WFC1 ≤ 103 B, WFO1 ≤ 270 B).
+- **WFO1/WFOA/WFOB — firmware update by URL** (`ota.h`): the board pulls
+  an `.ino.bin` over HTTP(S) via the core's `HTTPUpdate` on **core 1**
+  (never in hoverboardTask). Same safety contract as ArduinoOTA: password
+  checked on arrival, robot must stand still, wheels held at zero
+  (`ota_active`) from accept to reboot; a failed download keeps the old
+  firmware and reports WFOB with the `HTTPUpdate` error code. `https://`
+  uses `NetworkClientSecure.setInsecure()` — see `docs/ASSUMPTIONS.md`.
+- **`tools/ota_upload.sh`** now exists (was referenced by comments): hosts
+  an espota push with the `secrets.h` password — the LAN alternative to
+  URL-pull when the network has no client isolation.
+
+Compiles on both FQBNs (arduino-cli, ESP32 core 4.0.0):
+
+| FQBN | flash | RAM |
+|------|-------|-----|
+| `esp32:esp32:esp32` (WROOM) | 1 254 128 B (95 %) | 65 060 B (19 %) |
+| `esp32:esp32:esp32s3` | 1 242 900 B (94 %) | 62 128 B (18 %) |
+
+⚠ Flash headroom is now thin (~57 KB / ~68 KB) — the price of HTTP+TLS on
+the default **dual-slot 1.3 MB OTA partition scheme**. Do not "fix" it with
+`huge_app.csv`: that scheme has no second slot and would break OTA itself.
+
+## 0.1.0 — protocol v2
 
 Compiles clean on **both** FQBNs (arduino-cli, ESP32 core 4.0.0):
 

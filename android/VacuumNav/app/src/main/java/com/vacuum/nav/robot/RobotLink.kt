@@ -64,5 +64,13 @@ interface RobotLink {
      *  no-op in the simulator, which beeps on the phone instead). */
     fun setBuzzer(on: Boolean) {}
 
+    /** Send a raw v2 datagram the control loop doesn't own (WFC1/WFO1,
+     *  docs/PROTOCOL.md §3.9/§3.10). false = no such channel (SIM). */
+    fun send(bytes: ByteArray): Boolean = false
+
+    /** One-shot admin replies (WFCA/WFOA/WFOB). SIM never emits;
+     *  UDP/BLE emit raw datagrams from the board. */
+    val adminReplies: SharedFlow<ByteArray>
+
     fun close()
 }

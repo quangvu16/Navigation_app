@@ -46,6 +46,12 @@ class UdpRobotLink(
     private val _state = MutableStateFlow(LinkState.DISCOVERING)
     override val state: StateFlow<LinkState> = _state.asStateFlow()
 
+    // Admin channel (WFC1/WFO1 out, WFCA/WFOA/WFOB in). Outbound datagrams
+    // queue here because the cmd socket lives on the link thread.
+    private val _adminReplies = MutableSharedFlow<ByteArray>(extraBufferCapacity = 8)
+    override val adminReplies: SharedFlow<ByteArray> = _adminReplies.asSharedFlow()
+    private val outQueue = java.util.concurrent.ConcurrentLinkedQueue<ByteArray>()
+
     private val running = AtomicBoolean(true)
 
     @Volatile private var rpmL = 0f
@@ -75,6 +81,11 @@ class UdpRobotLink(
 
     override fun setBuzzer(on: Boolean) {
         buzzer = on
+    }
+
+    override fun send(bytes: ByteArray): Boolean {
+        outQueue.add(bytes)
+        return true
     }
 
     override fun close() {
@@ -136,6 +147,12 @@ class UdpRobotLink(
 
             while (running.get()) {
                 val now = System.currentTimeMillis()
+
+                // --- admin datagrams queued by send() (WFC1/WFO1) ---
+                while (true) {
+                    val pkt = outQueue.poll() ?: break
+                    runCatching { send(pkt, boardEp) }
+                }
 
                 // --- HELO retry until HACK granted (1 s cadence) ---
                 if (!claimed && now - lastHelo >= 1000) sendHelo()
@@ -207,6 +224,8 @@ class UdpRobotLink(
                             }
                             // PNG2: RTT samples are consumed by Diagnostics
                             // (lowest-RTT wins, prompt §3); nothing to do here.
+                            "WFCA", "WFOA", "WFOB" ->
+                                _adminReplies.tryEmit(d)   // settings UI
                         }
                     }
                 } catch (_: java.net.SocketTimeoutException) {

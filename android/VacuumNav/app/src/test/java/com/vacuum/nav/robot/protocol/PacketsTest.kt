@@ -295,6 +295,75 @@ class PacketsTest {
         assertArrayEquals("PNG1".toByteArray(), pkt.copyOf(4))
     }
 
+    // ---- WFC1/WFCA + WFO1/WFOA/WFOB (docs/PROTOCOL.md §3.9/§3.10) ----
+
+    @Test
+    fun wfc1BuilderMatchesWireFormat() {
+        val pkt = Packets.buildWfc1("MyNet", "hunter2")
+        assertEquals(7 + 5 + 7, pkt.size)
+        assertArrayEquals("WFC1".toByteArray(), pkt.copyOf(4))
+        assertEquals(0, pkt[4].toInt() and 0xFF)      // flags: join (no clear)
+        assertEquals(5, pkt[5].toInt() and 0xFF)      // ssid_len
+        assertEquals(7, pkt[6].toInt() and 0xFF)      // pass_len
+        assertEquals("MyNet", String(pkt, 7, 5, Charsets.UTF_8))
+        assertEquals("hunter2", String(pkt, 12, 7, Charsets.UTF_8))
+    }
+
+    @Test
+    fun wfc1ClearFlagEncodesEmptyPayload() {
+        val pkt = Packets.buildWfc1("", "", clear = true)
+        assertEquals(7, pkt.size)
+        assertEquals(1, pkt[4].toInt() and 0xFF)      // flags bit0 = clear
+        assertEquals(0, pkt[5].toInt() and 0xFF)
+        assertEquals(0, pkt[6].toInt() and 0xFF)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun wfc1RejectsOverlongSsid() {
+        Packets.buildWfc1("x".repeat(33), "p")
+    }
+
+    @Test
+    fun wfo1BuilderMatchesWireFormat() {
+        val url = "http://192.168.1.10/fw.bin"
+        val pkt = Packets.buildWfo1(url, "secret")
+        assertEquals(6 + url.length + 6, pkt.size)
+        assertArrayEquals("WFO1".toByteArray(), pkt.copyOf(4))
+        assertEquals(url.length, pkt[4].toInt() and 0xFF)
+        assertEquals(6, pkt[5].toInt() and 0xFF)
+        assertEquals(url, String(pkt, 6, url.length, Charsets.US_ASCII))
+        assertEquals("secret", String(pkt, 6 + url.length, 6, Charsets.UTF_8))
+    }
+
+    @Test
+    fun wfcaDecoderReadsStatus() {
+        val b = byteArrayOf('W'.code.toByte(), 'F'.code.toByte(),
+            'C'.code.toByte(), 'A'.code.toByte(), 0)
+        assertEquals(0, Packets.decodeWfca(b)!!.status)
+        assertTrue(Packets.decodeWfca(b)!!.ok)
+        b[4] = 2
+        assertEquals(2, Packets.decodeWfca(b)!!.status)
+        assertFalse(Packets.decodeWfca(b)!!.ok)
+        assertNull(Packets.decodeWfca("HACK".toByteArray() + ByteArray(5)))
+    }
+
+    @Test
+    fun wfoaWfobDecodersReadStatus() {
+        val a = byteArrayOf('W'.code.toByte(), 'F'.code.toByte(),
+            'O'.code.toByte(), 'A'.code.toByte(), 0)
+        assertTrue(Packets.decodeWfoa(a)!!.accepted)
+        a[4] = 3
+        assertFalse(Packets.decodeWfoa(a)!!.accepted)
+
+        val ob = byteArrayOf('W'.code.toByte(), 'F'.code.toByte(),
+            'O'.code.toByte(), 'B'.code.toByte(), 1, 42)
+        val r = Packets.decodeWfob(ob)!!
+        assertEquals(1, r.status)
+        assertEquals(42, r.detail)
+        assertFalse(r.ok)
+        assertNull(Packets.decodeWfob(a))   // 5 B / wrong magic
+    }
+
     // ---- helpers ----------------------------------------------------------
 
     private fun ByteArray.putAscii(off: Int, s: String) {

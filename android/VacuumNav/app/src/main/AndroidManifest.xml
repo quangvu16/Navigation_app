@@ -29,9 +29,15 @@
     <uses-permission
         android:name="android.permission.BLUETOOTH_ADMIN"
         android:maxSdkVersion="30" />
+    <!-- Robot Wi-Fi provisioning (WifiSettingsDialog): WiFi scan results are
+         location-gated below API 33; on 31-32 this is also the only scan
+         permission the app needs (BLE uses neverForLocation instead). -->
     <uses-permission
         android:name="android.permission.ACCESS_FINE_LOCATION"
-        android:maxSdkVersion="30" />
+        android:maxSdkVersion="32" />
+    <uses-permission
+        android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation" />
     <uses-feature
         android:name="android.hardware.bluetooth_le"
         android:required="false" />

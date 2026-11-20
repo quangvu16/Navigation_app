@@ -171,7 +171,8 @@ static void hbSetBuzzer(bool on) {
 }
 
 // ------------------------------------------------------------------- socket
-static uint8_t  ph_rx_buf[64];        // HELO/HBC2/PNG1/HBC1 all fit
+// WFC1 (7+32+64=103 B) and WFO1 (6+200+64=270 B) are the largest receives.
+static uint8_t  ph_rx_buf[320];
 static uint8_t  ph_tx_buf[HBT2_LEN];
 
 // Owner state - written by hoverboardTask (core 0), read by the scan sender
@@ -266,6 +267,27 @@ static void phRelease(uint8_t reason) {
     phSendTo(to, ph_tx_buf, BYE1_LEN);
   }
   Serial.printf("phone_link: owner released (reason %u)\n", reason);
+}
+
+// Async WFOB target (ota.h, core 1): the owner's ORIGIN endpoint - for UDP
+// that is the phone's cmd socket, where the app drains WFCA/WFOA/WFOB.
+static bool phOwnerReplyTarget(PhTarget & out) {
+  bool ok;
+  portENTER_CRITICAL(&ph_owner_mux);
+  ok = ph_owned;
+  out = ph_owner;
+  portEXIT_CRITICAL(&ph_owner_mux);
+  return ok;
+}
+
+// ota.h result hook: WFOB = [magic4][status u8][detail u8]. Sent to the
+// owner after a URL-OTA attempt; if the lease died during the download,
+// nobody is listening and the packet is simply skipped.
+static void otaNotifyOwner(uint8_t status, uint8_t detail) {
+  PhTarget to;
+  if (!phOwnerReplyTarget(to)) return;
+  uint8_t b[6] = {'W', 'F', 'O', 'B', status, detail};
+  phSendTo(to, b, 6);
 }
 
 // Scan sender (core 1) asks where the latest scan goes.
@@ -532,6 +554,65 @@ static void phHandleDatagram(const uint8_t * d, int n, const PhTarget & from) {
                              (cflags & HBC_ENABLE) ? want_r : 0.0f);
     }
     hb_buzzer_phone = (cflags & HBC_BUZZER) != 0;
+    return;
+  }
+
+  // ------------------------------------------------------------- WFC1/WFCA
+  // WiFi provisioning (docs/PROTOCOL.md §3.9). Owner-gated like HBC2: the
+  // phone must have claimed the link first (over BLE or UDP - which is the
+  // point: you can configure the network before the board has joined one).
+  // Reply goes out BEFORE wifi_cfg stages the switch; wifiLoop applies the
+  // new credentials >=100 ms later so WFCA is already on the wire.
+  if (n >= 7 && memcmp(d, "WFC1", 4) == 0) {
+    uint8_t status = 0;
+    const bool clear = (d[4] & 0x01) != 0;
+    const uint8_t sl = d[5];
+    const uint8_t pl = d[6];
+    if (!from_owner) {
+      status = 2;                                 // not the owner
+      ph_cmd_bad++;
+    } else if (n < 7 + (int)sl + (int)pl ||
+               sl > WIFI_CFG_SSID_MAX || pl > WIFI_CFG_PASS_MAX) {
+      status = 1;                                 // bad length
+    } else if (!clear && sl == 0) {
+      status = 1;                                 // SSID required to join
+    } else {
+#if ROBOT_WIFI_MODE == WIFI_MODE_AP_ONLY
+      status = 4;                                 // AP-only build: no STA join
+#else
+      // Reply first, then stage (apply happens >=100 ms out in wifiLoop).
+      wifiCfgRequest(d + 7, sl, d + 7 + sl, pl, clear);
+#endif
+    }
+    uint8_t r[5] = {'W', 'F', 'C', 'A', status};
+    phSendTo(from, r, 5);
+    if (status == 0) {
+      Serial.printf("phone_link: WFC1 accepted, joining \"%s\"%s\n",
+                    clear ? "(default)" : (const char *)d + 7,
+                    clear ? " (NVS cleared)" : "");
+    }
+    return;
+  }
+
+  // ------------------------------------------------------------- WFO1/WFOA
+  // URL firmware update (docs/PROTOCOL.md §3.10). Validate + reply here;
+  // the download itself runs in loop() core 1 (ota.h otaUrlRun).
+  if (n >= 6 && memcmp(d, "WFO1", 4) == 0) {
+    const uint8_t url_len = d[4];
+    const uint8_t pass_len = d[5];
+    uint8_t status;
+    if (!from_owner) {
+      status = 1;                                 // not the owner
+      ph_cmd_bad++;
+    } else if (n < 6 + (int)url_len + (int)pass_len ||
+               url_len < 8 || pass_len > 64) {
+      status = 4;                                 // bad length / url
+    } else {
+      status = otaUrlRequest((const char *)d + 6, url_len,
+                             (const char *)d + 6 + url_len, pass_len);
+    }
+    uint8_t r[5] = {'W', 'F', 'O', 'A', status};
+    phSendTo(from, r, 5);
     return;
   }
 

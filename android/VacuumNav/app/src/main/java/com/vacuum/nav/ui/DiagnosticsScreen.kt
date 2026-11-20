@@ -17,9 +17,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,9 +41,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vacuum.nav.data.RunStats
+import com.vacuum.nav.robot.protocol.Packets
 import com.vacuum.nav.robot.RobotConfig
 import com.vacuum.nav.service.RobotService
 
@@ -68,6 +73,39 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         ?: remember { kotlinx.coroutines.flow.MutableStateFlow(
             com.vacuum.nav.robot.NavUiState()) }).collectAsState()
     var copied by remember { mutableStateOf(false) }
+
+    // ---- firmware update by URL (WFO1, docs/PROTOCOL.md §3.10) ----------
+    var otaUrl by remember { mutableStateOf("") }
+    var otaPass by remember { mutableStateOf("") }
+    var otaStatus by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(link) {
+        link?.adminReplies?.collect { d ->
+            when (String(d, 0, minOf(4, d.size), Charsets.US_ASCII)) {
+                "WFOA" -> {
+                    val r = Packets.decodeWfoa(d) ?: return@collect
+                    otaStatus = when (r.status) {
+                        0 -> "Accepted - downloading while the robot is still"
+                        1 -> "Denied: not connected as owner (reconnect)"
+                        2 -> "Wrong OTA password"
+                        3 -> "Stop the robot first"
+                        4 -> "Bad URL (must start with http:// or https://)"
+                        5 -> "OTA disabled on this firmware"
+                        7 -> "An update is already running"
+                        else -> "Rejected (code ${r.status})"
+                    }
+                }
+                "WFOB" -> {
+                    val r = Packets.decodeWfob(d) ?: return@collect
+                    otaStatus = when (r.status) {
+                        0 -> "Flashed - the robot reboots now; the link returns after ~10 s"
+                        1 -> "Download failed (code ${r.detail}) - old firmware kept"
+                        2 -> "No update available at that URL"
+                        else -> "Failed (code ${r.status}/${r.detail})"
+                    }
+                }
+            }
+        }
+    }
 
     val cfg = remember { RobotConfig() }
     val report = buildString {
@@ -206,6 +244,61 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         "${cfg.boardScanPort}/${cfg.boardCmdPort}/" +
                         "${cfg.boardTelemPort}",
                     fontSize = Ts.Body,
+                )
+            }
+
+            Section("Firmware (OTA)") {
+                Text(
+                    "The robot pulls the image from a URL it can reach " +
+                        "(docs/PROTOCOL.md §3.10). Password = OTA_PASSWORD.",
+                    fontSize = Ts.Caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(Sp.Xs))
+                OutlinedTextField(
+                    value = otaUrl,
+                    onValueChange = { otaUrl = it },
+                    singleLine = true,
+                    label = { Text("Firmware URL (.bin)") },
+                    placeholder = { Text("https://…/vacuum_phone_esp32.ino.bin") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(Sp.Xs))
+                OutlinedTextField(
+                    value = otaPass,
+                    onValueChange = { otaPass = it },
+                    singleLine = true,
+                    label = { Text("OTA password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(Sp.Xs))
+                Button(
+                    onClick = {
+                        val l = link
+                        val sent = l != null &&
+                            l.send(Packets.buildWfo1(otaUrl.trim(), otaPass))
+                        otaStatus = if (sent)
+                            "Sent - waiting for the board's answer..."
+                        else
+                            "No robot link - connect via Wi-Fi or Bluetooth first"
+                    },
+                    enabled = otaUrl.startsWith("http") &&
+                        otaStatus?.startsWith("Sent") != true,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Update firmware") }
+                otaStatus?.let {
+                    Spacer(Modifier.height(Sp.Xs))
+                    Text(it, fontSize = Ts.Caption,
+                        color = MaterialTheme.colorScheme.primary)
+                }
+                Spacer(Modifier.height(Sp.Xs))
+                Text(
+                    "Robot must stand still; wheels stay locked during the " +
+                        "download. The link and telemetry keep running - only " +
+                        "lidar scans pause. On success the board reboots.",
+                    fontSize = Ts.Caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 

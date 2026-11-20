@@ -224,3 +224,31 @@ robot is `src/robot_navigation/param/hoverboard.yaml` (MPPI), launched by
     `find .git -name "._*" -delete` before/after commits if they reappear.
 - Tooling downloaded for the build lives in `.toolchain/` (not committed);
   the project's Gradle wrapper (committed) reproduces the build elsewhere.
+
+## 10. Public-Wi-Fi provisioning + URL OTA (2026-11-20)
+
+- **"Public WiFi" means an untrusted infrastructure LAN without client
+  isolation** (home/office router). True hotspot networks (coffee-shop
+  style AP isolation) block phone↔board UDP entirely — on those, use the
+  BLE link, which needs no network at all; WFC1/WFO1 provisioning also
+  works over BLE for exactly that reason. The board needs *outbound*
+  internet only for WFO1's firmware download, never for the control link.
+- **WFC1 trust model**: the owner lease (HELO claim) gates Wi-Fi changes,
+  same as driving the robot — possession of the claimed link IS the
+  credential, consistent with HBC2. A wrong password is recoverable: the
+  board fails to join, STA_FALLBACK opens its own AP after 20 s, and you
+  re-provision. `WFC1` with flags bit0 clears NVS back to `secrets.h`.
+- **WFO1 trust model**: owner lease + `OTA_PASSWORD` on every request
+  (ArduinoOTA parity). `https://` downloads use
+  `NetworkClientSecure.setInsecure()` — encrypted but **not** CA-pinned;
+  an active MITM on the LAN could substitute an image. On a network you
+  don't control, prefer the LAN push path (`tools/ota_upload.sh`,
+  ArduinoOTA is password-authenticated end-to-end), or serve the image
+  from a host you trust. Documented here rather than silently accepted.
+- **Flash budget**: 0.2.0 sits at 94–95 % of the default 1.3 MB dual-slot
+  OTA partition scheme. The scheme must stay (two slots are what makes
+  OTA safe); every future firmware feature has to budget from the
+  remaining ~57–68 KB, and RAM headroom (~262 KB) is still comfortable.
+- **NVS layout**: `Preferences` namespace `vacuum`, keys `ssid` (≤32 B)
+  and `pass` (≤64 B, empty = open network). Absent keys = compile-time
+  `secrets.h` pair; WFC1 flags bit0 deletes both keys.
