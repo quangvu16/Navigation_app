@@ -241,7 +241,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
         Column(Modifier.padding(Sp.Md)) {
             Text(title, fontSize = Ts.Body, fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(Sp.Xs))
             content()
         }
     }

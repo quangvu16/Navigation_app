@@ -82,7 +82,7 @@ fun DriveScreen(modifier: Modifier = Modifier) {
         )
 
         // ---- lidar behaviour modes (robot_ws/hoverboard_laser) -----------
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(Sp.Sm))
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Sp.Xs),
@@ -110,7 +110,7 @@ fun DriveScreen(modifier: Modifier = Modifier) {
                 else -> MaterialTheme.colorScheme.surfaceVariant
             },
         ) {
-            Column(Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.padding(Sp.Sm), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     when {
                         warn.buzzer ->
@@ -316,7 +316,7 @@ private fun SonarChip(name: String, meters: Float, modifier: Modifier) {
             .surfaceVariant).copy(alpha = 0.85f),
     ) {
         Column(
-            Modifier.padding(10.dp),
+            Modifier.padding(Sp.Sm),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(name, fontSize = Ts.Caption,

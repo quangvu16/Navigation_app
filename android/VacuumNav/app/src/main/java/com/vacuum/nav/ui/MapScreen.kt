@@ -512,7 +512,7 @@ private fun RailButton(icon: ImageVector, desc: String, onClick: () -> Unit) {
         shadowElevation = 4.dp,
     ) {
         Column(
-            Modifier.size(52.dp).padding(6.dp),
+            Modifier.size(52.dp).padding(Sp.Xs),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -564,7 +564,7 @@ private fun androidx.compose.foundation.layout.BoxScope.ModeHint(text: String) {
     ) {
         Text(
             text, color = Color.White, fontSize = Ts.Caption,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = Sp.Sm, vertical = Sp.Xs),
         )
     }
 }
