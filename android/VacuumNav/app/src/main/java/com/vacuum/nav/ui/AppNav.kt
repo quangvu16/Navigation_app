@@ -53,6 +53,14 @@ fun AppNav() {
         ?: remember { kotlinx.coroutines.flow.MutableStateFlow(
             LinkState.CLAIMED) }).collectAsState()
 
+    // Phase 6 of the redesign (the approved gated diff): hardware/gesture
+    // back pops Maps/History/Diagnostics to Home instead of exiting the
+    // app - matching each screen's TopAppBar back. Tab order/icons and
+    // every other route stay exactly as they were.
+    androidx.activity.compose.BackHandler(enabled = sub.isNotEmpty()) {
+        sub = ""
+    }
+
     Scaffold(
         bottomBar = {
             NavigationBar {
