@@ -68,6 +68,12 @@ Rules inherited from the redesign:
 5. **Signatures preserved** (from baseline): deadman joystick, always-on
    E-STOP, long-press goal, Manual/Avoid/Follow chips, tab order,
    warning-banner semantics.
+6. **Destructive actions confirm** — History Clear, Maps Delete, Zones
+   Clear all (and anything new) raise an AlertDialog naming the
+   consequence first (run-2 FINDING-014).
+7. **Every data-heavy screen scrolls** — Home included; no fixed Columns
+   with `weight()` spacers (run-2 FINDING-013; weights are illegal in
+   scrollable columns).
 
 ## Regression greps (run after any screen change)
 

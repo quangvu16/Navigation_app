@@ -7,7 +7,7 @@
   "brief": "Use google theme with icons",
   "designScore": "A",
   "slopScore": "A",
-  "scoreNotes": "Static regression after all six phases: re-run greps clean (emoji 0, em/en-dash 0, manual-back 0, inline-hex 0); every baseline finding fixed, no high-impact open -> no B-cap. Live regression (font scale, dark-mode walkthrough, cold Trunk drops) pending a connected device - see unverified.",
+  "scoreNotes": "Run-2 close-out: all 16 findings fixed across both runs. Static regression greps clean (emoji 0, visible em-dash 0, inline hex 0, raw sp/fontSize 0, manual back 0, off-scale gaps 0, broken interpolations 0, Text(+) 0, destructive actions all confirmed). Design mean 4.0 -> A; slop A (no tell-mapped findings open). Live checks still pending a device - see unverified.",
   "categories": {
     "navigation": "A",
     "screenAnatomy": "A",
@@ -110,6 +110,66 @@
       "summary": "Em-dashes in visible strings ('Stuck \u2014 gave up', 'Robot stopped \u2014 E-STOP') against the copy rules",
       "status": "fixed",
       "fixedIn": "Phase 5"
+    },
+    {
+      "id": "FINDING-011",
+      "impact": "medium",
+      "category": "copy",
+      "tell": null,
+      "summary": "Diagnostics stale-age strings are broken interpolations: '-e s ago (stale)' and ' ms ago (stale)' render garbage (missing values)",
+      "where": "ui/DiagnosticsScreen.kt:126,135",
+      "status": "fixed",
+      "fixedIn": "run-2"
+    },
+    {
+      "id": "FINDING-012",
+      "impact": "medium",
+      "category": "copy",
+      "tell": null,
+      "summary": "Home status pill hardcodes 'SIM - IDLE' regardless of actual transport/state (says SIM even on Wi-Fi/BT link)",
+      "where": "ui/HomeScreen.kt:219",
+      "status": "fixed",
+      "fixedIn": "run-2"
+    },
+    {
+      "id": "FINDING-013",
+      "impact": "medium",
+      "category": "anatomy",
+      "tell": null,
+      "summary": "HomeScreen has no scroll container (fixed Column + weight spacer): clips on small screens and at 1.3x font",
+      "where": "ui/HomeScreen.kt",
+      "status": "fixed",
+      "fixedIn": "run-2"
+    },
+    {
+      "id": "FINDING-014",
+      "impact": "medium",
+      "category": "interaction",
+      "tell": null,
+      "summary": "Destructive actions fire with no confirmation: History 'Clear', Maps 'Delete', Zones 'Clear all'",
+      "where": "ui/HistoryScreen.kt:77, ui/MapsScreen.kt:207, ui/ZonesScreen.kt:297",
+      "status": "fixed",
+      "fixedIn": "run-2"
+    },
+    {
+      "id": "FINDING-015",
+      "impact": "medium",
+      "category": "typography",
+      "tell": null,
+      "summary": "10 gap/padding values off the Sp rhythm scale (20/10/6/72 dp) despite Tokens.kt declaring Sp the only padding scale",
+      "where": "HomeScreen, DriveScreen, MapScreen, SchedulesScreen, DiagnosticsScreen",
+      "status": "fixed",
+      "fixedIn": "run-2"
+    },
+    {
+      "id": "FINDING-016",
+      "impact": "polish",
+      "category": "interaction",
+      "tell": null,
+      "summary": "Schedules FAB renders Text('+') instead of Icons.Filled.Add (used elsewhere) - glyph icon breaks the one-family rule",
+      "where": "ui/SchedulesScreen.kt:78",
+      "status": "fixed",
+      "fixedIn": "run-2"
     }
   ],
   "signaturesToPreserve": [
@@ -121,8 +181,8 @@
     "warning banner semantics (red frame + distance/bearing)"
   ],
   "unverified": [
-    "device disconnected mid-audit: dark mode live pass, 1.3x font scale, IME/keyboard",
+    "no device/adb this run: dark mode live pass, 1.3x font scale, IME/keyboard",
     "Trunk Test for interior screens is code-reconstructed, not cold-dropped",
-    "RN grep checklist adapted to Kotlin/Compose - emoji/hex/back greps run for real, RN-specific ones (ScrollView-of-map, useNativeDriver, GestureHandlerRootView) are N/A"
+    "FINDING-013 (Home clipping) severity at 1.3x font is inferred from code, not rendered"
   ]
 }
