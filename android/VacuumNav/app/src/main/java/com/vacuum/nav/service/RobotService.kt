@@ -18,6 +18,8 @@ import com.vacuum.nav.R
 import com.vacuum.nav.data.RunStats
 import com.vacuum.nav.lidar.LidarBehaviorController
 import com.vacuum.nav.lidar.LidarMode
+import com.vacuum.nav.data.DockPose
+import com.vacuum.nav.data.DockStore
 import com.vacuum.nav.data.ZoneStore
 import com.vacuum.nav.robot.MapperEngine
 import com.vacuum.nav.robot.NavEngine
@@ -26,6 +28,9 @@ import com.vacuum.nav.robot.RobotConfig
 import com.vacuum.nav.robot.RobotLink
 import com.vacuum.nav.robot.SimRobotLink
 import com.vacuum.nav.ui.ScanTransform
+import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.sin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -133,6 +138,11 @@ class RobotService : Service() {
 
                     val cmd: Pair<Double, Double> = when {
                         eStop -> 0.0 to 0.0
+                        // Phase 8: reverse-in final leg of docking.
+                        dockPhase == DockPhase.FINAL ->
+                            lidarCtl.applyBumper(
+                                dockFinalStep(t.pose.x, t.pose.y,
+                                    t.pose.theta) ?: (0.0 to 0.0))
                         // Phase 4: go-to-goal owns the wheels until it
                         // finishes or the joystick/lidar mode takes over.
                         goToActive -> {
@@ -149,6 +159,8 @@ class RobotService : Service() {
                                     st == NavState.REJECTED
                                 ) {
                                     goToActive = false
+                                    notifyApproachEnded(
+                                        st == NavState.REACHED)
                                     0.0 to 0.0
                                 } else {
                                     lidarCtl.applyBumper(vw)
@@ -333,6 +345,86 @@ class RobotService : Service() {
         var exploreActive = false
             private set
 
+        // ---- Phase 8: docking --------------------------------------------
+        /** NONE -> APPROACH (GoTo to0.6 m in front) -> FINAL (reverse in). */
+        enum class DockPhase { NONE, APPROACH, FINAL, DOCKED }
+
+        @Volatile
+        var dockPhase: DockPhase = DockPhase.NONE
+            private set
+
+        @Volatile
+        private var dockTarget: DockPose? = null
+
+        @Volatile
+        private var finalStartMs = 0L
+
+        /** Save the robot's current pose as the dock ("dock is here"). */
+        fun setDock(context: Context) {
+            val pose = link?.telemetry?.value?.pose ?: return
+            DockStore.save(context,
+                DockPose(pose.x.toDouble(), pose.y.toDouble(),
+                    pose.theta.toDouble()))
+        }
+
+        /**
+         * Drive to the dock: GoTo to the approach point0.6 m BEHIND the
+         * docked pose (the robot faces outward when docked), then the
+         * reverse-in final leg (repo dock_manager behaviour: back in
+         * because the front sonar reflex only watches the front -
+         * docs/ASSUMPTIONS.md §4.1). Returns false when no dock is saved.
+         */
+        fun goDock(context: Context): Boolean {
+            val dock = DockStore.load(context) ?: return false
+            dockTarget = dock
+            val ax = dock.x - cos(dock.theta) * 0.6
+            val ay = dock.y - sin(dock.theta) * 0.6
+            if (!startGoTo(context, ax, ay)) return false
+            dockPhase = DockPhase.APPROACH
+            return true
+        }
+
+        fun cancelDock() {
+            dockPhase = DockPhase.NONE
+            dockTarget = null
+            cancelGoTo()
+        }
+
+        /** Final reverse-in leg; returns null when the phase is done. */
+        fun dockFinalStep(poseX: Float, poseY: Float, theta: Float): Pair<Double, Double>? {
+            val dock = dockTarget
+            if (dock == null || dockPhase != DockPhase.FINAL) return null
+            val d = hypot(dock.x - poseX, dock.y - poseY)
+            // Face the dock heading while backing (small P on heading error).
+            var headingErr = dock.theta - theta
+            while (headingErr > Math.PI) headingErr -= 2 * Math.PI
+            while (headingErr < -Math.PI) headingErr += 2 * Math.PI
+            if (d < 0.10) {
+                dockPhase = DockPhase.DOCKED
+                dockTarget = null
+                return 0.0 to 0.0
+            }
+            if (System.currentTimeMillis() - finalStartMs > 4000) {
+                dockPhase = DockPhase.DOCKED   // timed out: call it docked
+                dockTarget = null
+                return 0.0 to 0.0
+            }
+            val w = (headingErr * 1.5).coerceIn(-0.5, 0.5)
+            return -0.08 to w
+        }
+
+        fun notifyApproachEnded(navOk: Boolean) {
+            if (dockPhase == DockPhase.APPROACH) {
+                if (navOk) {
+                    dockPhase = DockPhase.FINAL
+                    finalStartMs = System.currentTimeMillis()
+                } else {
+                    dockPhase = DockPhase.NONE
+                    dockTarget = null
+                }
+            }
+        }
+
         /** Where exploration started (returned to when finished, §5). */
         @Volatile
         private var exploreStart: Pair<Double, Double>? = null
@@ -371,6 +463,8 @@ class RobotService : Service() {
         }
 
         fun setLidarMode(mode: LidarMode) {
+            dockPhase = DockPhase.NONE
+            dockTarget = null
             lidarCtl.setMode(mode)
             if (mode != LidarMode.MANUAL) {
                 // A lidar behaviour owns the wheels: cleaning and go-to yield.
@@ -463,6 +557,8 @@ class RobotService : Service() {
          *  any lidar behaviour (reference: nodes pause while joystick
          *  active). */
         fun manualOverride() {
+            dockPhase = DockPhase.NONE
+            dockTarget = null
             if (autoClean) {
                 autoClean = false
                 RunStats.stopRun()
@@ -476,6 +572,8 @@ class RobotService : Service() {
         }
 
         fun setEstop(on: Boolean) {
+            dockPhase = DockPhase.NONE
+            dockTarget = null
             eStop = on
             if (on) {
                 autoClean = false

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -48,6 +49,7 @@ import kotlin.math.abs
  */
 @Composable
 fun DriveScreen(modifier: Modifier = Modifier) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     val link = RobotService.link
     val telemetry by (link?.telemetry
         ?: remember { kotlinx.coroutines.flow.MutableStateFlow(
@@ -191,7 +193,40 @@ fun DriveScreen(modifier: Modifier = Modifier) {
             SonarChip("Right", telemetry.sonarRightM, Modifier.weight(1f))
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
+        // Phase 8: dock controls (repo behaviour: save pose, back in).
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            val dockPhase = RobotService.dockPhase
+            OutlinedButton(
+                onClick = { RobotService.setDock(ctx) },
+                Modifier.weight(1f).height(46.dp),
+            ) { Text("⚓ Set dock here", fontSize = 13.sp) }
+            Button(
+                onClick = { RobotService.goDock(ctx) },
+                Modifier.weight(1f).height(46.dp),
+                shape = RoundedCornerShape(50),
+                enabled = dockPhase == RobotService.Companion.DockPhase.NONE ||
+                    dockPhase == RobotService.Companion.DockPhase.DOCKED,
+            ) {
+                Text(
+                    when (dockPhase) {
+                        RobotService.Companion.DockPhase.APPROACH ->
+                            "Docking…"
+                        RobotService.Companion.DockPhase.FINAL ->
+                            "Backing in…"
+                        RobotService.Companion.DockPhase.DOCKED ->
+                            "Docked ✓"
+                        else -> "🏠 Go dock"
+                    },
+                    fontSize = 13.sp,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
         Button(
             onClick = { RobotService.setEstop(!eStop) },
             Modifier.fillMaxWidth().height(52.dp),

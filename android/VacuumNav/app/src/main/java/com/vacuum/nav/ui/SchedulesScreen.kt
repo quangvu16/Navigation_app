@@ -57,7 +57,12 @@ fun SchedulesScreen(modifier: Modifier = Modifier) {
     var editing by remember { mutableStateOf<Schedule?>(null) }
     var adding by remember { mutableStateOf(false) }
 
-    fun persist() = ScheduleStore.save(ctx, schedules.toList())
+    fun persist() {
+        val list = schedules.toList()
+        ScheduleStore.save(ctx, list)
+        // Phase 8: arm/re-arm the AlarmManager timers on every change.
+        com.vacuum.nav.data.Scheduler.scheduleAll(ctx, list)
+    }
 
     Scaffold(
         modifier = modifier,
