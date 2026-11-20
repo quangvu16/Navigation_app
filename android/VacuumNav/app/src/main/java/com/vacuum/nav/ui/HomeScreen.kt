@@ -25,6 +25,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CardDefaults
 import androidx.compose.foundation.Image
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.ui.res.painterResource
 import com.vacuum.nav.R
 import androidx.compose.material.icons.filled.BatteryChargingFull
@@ -87,11 +90,11 @@ fun HomeScreen(
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val nextScheduleText = remember {
         ScheduleStore.load(ctx).filter { it.enabled }
-            .minByOrNull { it.hour * 60 + it.minute }?.timeText ?: "—"
+            .minByOrNull { it.hour * 60 + it.minute }?.timeText ?: "-"
     }
 
     val batteryPct = when {
-        eStop -> "—"
+        eStop -> "-"
         else -> {
             val v = telemetry.batteryV.toDouble()
             val cfg = RobotConfig()
@@ -131,21 +134,38 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Welcome home!", fontSize = Ts.Display, fontWeight = FontWeight.Bold)
+            Text("VacuumNav", fontSize = Ts.Display, fontWeight = FontWeight.Bold)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Transport chip: SIM / Wi-Fi / BLE (FriendBot-style link).
                 TextButton(onClick = {
                     showConnect = true
                 }) {
-                    Text(
-                        when (linkType) {
-                            Transport.SIM -> "📱 SIM"
-                            Transport.UDP -> "📶 Wi-Fi"
-                            Transport.BLE -> "蓝牙 BLE"
-                        },
-                        fontSize = Ts.Body,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    androidx.compose.foundation.layout.Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement =
+                            androidx.compose.foundation.layout.Arrangement
+                                .spacedBy(Sp.Xxs),
+                    ) {
+                        // One icon family (FINDING-008): emoji -> Material.
+                        Icon(
+                            imageVector = when (linkType) {
+                                Transport.SIM -> Icons.Filled.PhoneAndroid
+                                Transport.UDP -> Icons.Filled.Wifi
+                                Transport.BLE -> Icons.Filled.Bluetooth
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            when (linkType) {
+                                Transport.SIM -> "SIM"
+                                Transport.UDP -> "Wi-Fi"
+                                Transport.BLE -> "Bluetooth"
+                            },
+                            fontSize = Ts.Body,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
                 TextButton(onClick = onOpenDiagnostics) {
                     Icon(Icons.Filled.Settings, contentDescription = "Diagnostics")
@@ -154,7 +174,7 @@ fun HomeScreen(
         }
         Spacer(Modifier.height(4.dp))
         Text(
-            if (eStop) "Robot stopped — E-STOP pressed"
+            if (eStop) "E-STOP pressed: robot stopped"
             else if (autoClean) "Cleaning now…"
             else "Ready to clean",
             fontSize = Ts.Body,

@@ -12,8 +12,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -85,10 +90,10 @@ fun DriveScreen(modifier: Modifier = Modifier) {
             ModeChip("Manual", mode == LidarMode.MANUAL, Modifier.weight(1f)) {
                 RobotService.setLidarMode(LidarMode.MANUAL)
             }
-            ModeChip("⚠ Avoid", mode == LidarMode.AVOID, Modifier.weight(1f)) {
+            ModeChip("Avoid", mode == LidarMode.AVOID, Modifier.weight(1f)) {
                 RobotService.setLidarMode(LidarMode.AVOID)
             }
-            ModeChip("🎯 Follow", mode == LidarMode.FOLLOW, Modifier.weight(1f)) {
+            ModeChip("Follow", mode == LidarMode.FOLLOW, Modifier.weight(1f)) {
                 RobotService.setLidarMode(LidarMode.FOLLOW)
             }
         }
@@ -109,7 +114,7 @@ fun DriveScreen(modifier: Modifier = Modifier) {
                 Text(
                     when {
                         warn.buzzer ->
-                            "⚠ OBSTACLE %.2f m %s".format(
+                            "OBSTACLE %.2f m %s".format(
                                 warn.nearestDistM,
                                 bearing(warn.nearestAngleRad))
                         warn.active ->
@@ -207,7 +212,18 @@ fun DriveScreen(modifier: Modifier = Modifier) {
             OutlinedButton(
                 onClick = { RobotService.setDock(ctx) },
                 Modifier.weight(1f).height(46.dp).pressScale(),
-            ) { Text("⚓ Set dock here", fontSize = Ts.Body) }
+            ) {
+                androidx.compose.foundation.layout.Row(
+                    horizontalArrangement =
+                        androidx.compose.foundation.layout.Arrangement
+                            .spacedBy(Sp.Xxs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.Place, contentDescription = null,
+                        modifier = Modifier.size(16.dp))
+                    Text("Set dock here", fontSize = Ts.Body)
+                }
+            }
             Button(
                 onClick = { RobotService.goDock(ctx) },
                 Modifier.weight(1f).height(46.dp).pressScale(),
@@ -215,18 +231,27 @@ fun DriveScreen(modifier: Modifier = Modifier) {
                 enabled = dockPhase == RobotService.Companion.DockPhase.NONE ||
                     dockPhase == RobotService.Companion.DockPhase.DOCKED,
             ) {
-                Text(
-                    when (dockPhase) {
-                        RobotService.Companion.DockPhase.APPROACH ->
-                            "Docking…"
-                        RobotService.Companion.DockPhase.FINAL ->
-                            "Backing in…"
-                        RobotService.Companion.DockPhase.DOCKED ->
-                            "Docked ✓"
-                        else -> "🏠 Go dock"
-                    },
-                    fontSize = Ts.Body,
-                )
+                androidx.compose.foundation.layout.Row(
+                    horizontalArrangement =
+                        androidx.compose.foundation.layout.Arrangement
+                            .spacedBy(Sp.Xxs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.Home, contentDescription = null,
+                        modifier = Modifier.size(16.dp))
+                    Text(
+                        when (dockPhase) {
+                            RobotService.Companion.DockPhase.APPROACH ->
+                                "Docking…"
+                            RobotService.Companion.DockPhase.FINAL ->
+                                "Backing in…"
+                            RobotService.Companion.DockPhase.DOCKED ->
+                                "Docked"
+                            else -> "Go dock"
+                        },
+                        fontSize = Ts.Body,
+                    )
+                }
             }
         }
 
@@ -297,7 +322,7 @@ private fun SonarChip(name: String, meters: Float, modifier: Modifier) {
             Text(name, fontSize = Ts.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
-                if (meters <= 0f) "—" else "%.2f m".format(meters),
+                if (meters <= 0f) "-" else "%.2f m".format(meters),
                 fontSize = Ts.Body, fontWeight = FontWeight.Bold,
                 color = if (blocked) Color.White
                 else MaterialTheme.colorScheme.onSurface,

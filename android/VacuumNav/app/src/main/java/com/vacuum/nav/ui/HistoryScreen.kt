@@ -19,7 +19,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
@@ -40,6 +45,8 @@ import java.util.Locale
  * coverage %). JSON-file store for now; Room is the production target
  * (schema sketched in HistoryStore).
  */
+// TopAppBar is still marked experimental in this material3 build.
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
@@ -56,9 +63,14 @@ fun HistoryScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onBack) { Text("‹ Back") }
-                Text("History", fontSize = Ts.Display,
-                    fontWeight = FontWeight.Bold)
+                TopAppBar(
+                title = { Text("History", fontSize = Ts.Display, fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+            )
                 Spacer(Modifier.weight(1f))
                 if (runs.isNotEmpty()) {
                     TextButton(onClick = {
@@ -70,7 +82,7 @@ fun HistoryScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             if (runs.isEmpty()) {
                 Spacer(Modifier.height(24.dp))
                 Text(
-                    "No runs yet — start a clean and it will show up here.",
+                    "No runs yet. Start a clean and it will show up here.",
                     fontSize = Ts.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = Sp.Md),

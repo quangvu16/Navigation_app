@@ -21,7 +21,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -46,6 +51,8 @@ import com.vacuum.nav.service.RobotService
  * items (mirror test, wheel calibration wizard) light up when the real
  * link is connected.
  */
+// TopAppBar is still marked experimental in this material3 build.
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
@@ -95,9 +102,14 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onBack) { Text("‹ Back") }
-                Text("Diagnostics", fontSize = Ts.Display,
-                    fontWeight = FontWeight.Bold)
+                TopAppBar(
+                title = { Text("Diagnostics", fontSize = Ts.Display, fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+            )
             }
 
             Section("Link") {
@@ -111,7 +123,7 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 Text(
                     "Last scan: " + when {
                         scanAge < 0 -> "never"
-                        scanAge > 3000 -> "${scanAge / 1000} s ago ⚠"
+                        scanAge > 3000 -> "-e s ago (stale)"
                         else -> "$scanAge ms ago"
                     },
                     fontSize = Ts.Body,
@@ -120,7 +132,7 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     "Last telemetry: " + when {
                         stats.lastTelemAgeMs < 0 -> "never"
                         stats.lastTelemAgeMs > 1000 ->
-                            "${stats.lastTelemAgeMs} ms ago ⚠"
+                            " ms ago (stale)"
                         else -> "${stats.lastTelemAgeMs} ms ago"
                     },
                     fontSize = Ts.Body,
@@ -181,7 +193,7 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 Text(
                     "lidar ${cfg.scanBins} bins · mirror ${cfg.lidarMirror} · " +
                         "yaw ${cfg.lidarMountYawDeg}° · " +
-                        "range ${cfg.lidarMinRangeM}–${cfg.lidarMaxRangeM} m",
+                        "range ${cfg.lidarMinRangeM} to  m",
                     fontSize = Ts.Body,
                 )
                 Text(
@@ -205,7 +217,7 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         report))
                     copied = true
                 }) {
-                    Text(if (copied) "Copied ✓" else "Copy report")
+                    Text(if (copied) "Copied" else "Copy report")
                 }
             }
             Spacer(Modifier.height(24.dp))
@@ -213,7 +225,7 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-private fun fmtM(m: Float) = if (m <= 0f) "—" else "%.2f m".format(m)
+private fun fmtM(m: Float) = if (m <= 0f) "-" else "%.2f m".format(m)
 
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {

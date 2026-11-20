@@ -138,7 +138,7 @@ private fun LinkErrorBanner() {
         color = MaterialTheme.colorScheme.error,
     ) {
         Text(
-            "⚠ Robot link lost — commands stopped. Check Wi-Fi/Bluetooth.",
+            "Robot link lost. Commands stopped. Check Wi-Fi/Bluetooth.",
             color = Color.White,
             fontSize = Ts.Body,
             fontWeight = FontWeight.Medium,

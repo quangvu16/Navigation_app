@@ -183,7 +183,7 @@ fun MapScreen(
                         val n = MapStore.list(ctx)
                             .maxOfOrNull { it.floor } ?: 0
                         MapStore.save(ctx, "Floor ${n + 1}", n + 1, snap)
-                        saveHint = "Saved Floor ${n + 1}"
+                        saveHint = "Saved floor "
                     } else {
                         saveHint = "Map a bit first"
                     }
@@ -200,7 +200,7 @@ fun MapScreen(
             if (mode == 1) {
                 val rooms = segResult?.rooms
                 if (rooms.isNullOrEmpty()) {
-                    ModeHint("No rooms yet — map more of the space first")
+                    ModeHint("No rooms yet. Map more of the space first.")
                 } else {
                     // Tap to select rooms for a targeted clean (§5/§8);
                     // stable ids carry user names (RoomNames).

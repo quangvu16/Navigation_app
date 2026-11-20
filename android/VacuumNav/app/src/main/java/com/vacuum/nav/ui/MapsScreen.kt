@@ -25,7 +25,13 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
@@ -53,6 +59,8 @@ import java.util.Locale
  * new floor; "Load" installs it as the base layer AND into the nav
  * costmap, so go-to / rooms / exploration work on that floor immediately.
  */
+// TopAppBar is still marked experimental in this material3 build.
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
@@ -74,7 +82,7 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 maps.add(meta)
                 status = "Imported ${meta.name}"
             } else {
-                status = "Import failed — not a VacuumNav map file"
+                status = "Import failed: not a VacuumNav map file"
             }
         }
     }
@@ -86,7 +94,7 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 onClick = {
                     val snap = RobotService.mapper?.snapshot?.value
                     if (snap == null) {
-                        status = "Nothing mapped yet — explore first"
+                        status = "Nothing mapped yet. Explore first."
                     } else {
                         val floor = (maps.maxOfOrNull { it.floor } ?: 0) + 1
                         val meta = MapStore.save(ctx, "Floor $floor", floor,
@@ -96,7 +104,7 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     }
                 },
                 containerColor = MaterialTheme.colorScheme.primary,
-            ) { Text("💾", fontSize = Ts.Headline) }
+            ) { Icon(androidx.compose.material.icons.Icons.Filled.Save, contentDescription = "Save map", tint = MaterialTheme.colorScheme.onPrimary) }
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
@@ -104,12 +112,19 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onBack) { Text("‹ Back") }
-                Text("Maps", fontSize = Ts.Display, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = {
-                    importLauncher.launch(arrayOf("application/json", "*/*"))
-                }) { Text("Import", fontSize = Ts.Body) }
+                TopAppBar(
+                title = { Text("Maps", fontSize = Ts.Display, fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    TextButton(onClick = {
+                        importLauncher.launch(arrayOf("application/json", "*/*"))
+                    }) { Text("Import", fontSize = Ts.Body) }
+                },
+            )
             }
             status?.let {
                 Text(
@@ -121,7 +136,7 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             if (maps.isEmpty()) {
                 Spacer(Modifier.height(24.dp))
                 Text(
-                    "No saved maps yet. Explore a floor, then tap 💾.",
+                    "No saved maps yet. Explore a floor, then tap Save.",
                     fontSize = Ts.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = Sp.Md),
