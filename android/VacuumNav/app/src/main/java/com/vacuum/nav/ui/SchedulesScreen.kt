@@ -14,8 +14,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -75,8 +78,14 @@ fun SchedulesScreen(modifier: Modifier = Modifier) {
             FloatingActionButton(
                 onClick = { adding = true },
                 containerColor = MaterialTheme.colorScheme.primary,
-            ) { Text("+", fontSize = Ts.Display,
-                color = androidx.compose.ui.graphics.Color.White) }
+            ) {
+                // One icon family (FINDING-016): the "+" glyph was text.
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = "Add schedule",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
@@ -138,7 +147,10 @@ fun SchedulesScreen(modifier: Modifier = Modifier) {
                         onClick = { editing = s },
                     )
                 }
-                item { Spacer(Modifier.height(72.dp)) }
+                item {
+                // FAB clearance: >= 56.dp FAB + 16.dp margin, on-scale.
+                Spacer(Modifier.height(Sp.Xl * 3))
+            }
             }
         }
     }
