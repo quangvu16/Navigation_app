@@ -301,6 +301,8 @@ fun MapScreen(
             }
             if (mode == 2) ModeHint("Zones: draw on the Zones tab")
             // Phase 4: go-to status / rejection feedback.
+            // One hint slot + AnimatedVisibility: transient states fade/slide
+            // in and out (Phase 4 motion layer) instead of popping.
             val navLabel = when {
                 saveHint != null -> saveHint
                 navMessage != null -> navMessage
@@ -311,16 +313,24 @@ fun MapScreen(
                 navState.state == com.vacuum.nav.robot.NavState.REACHED ->
                     "Goal reached"
                 navState.state == com.vacuum.nav.robot.NavState.STUCK ->
-                    "Stuck — gave up"
+                    "Stuck: gave up"
+                RobotService.exploreActive ->
+                    "Exploring… (frontier search, §6)"
+                !navState.active && navState.goal == null ->
+                    "Long-press the map to drive there"
                 else -> null
             }
-            if (navLabel != null) {
-                ModeHint(navLabel + if (navState.active)
-                    "  ·  long-press to re-goal, joystick to cancel" else "")
-            } else if (RobotService.exploreActive) {
-                ModeHint("Exploring… (frontier search, §6)")
-            } else if (!navState.active && navState.goal == null) {
-                ModeHint("Long-press the map to drive there")
+            androidx.compose.animation.AnimatedVisibility(
+                visible = navLabel != null,
+                enter = androidx.compose.animation.fadeIn() +
+                    androidx.compose.animation.expandVertically(),
+                exit = androidx.compose.animation.fadeOut() +
+                    androidx.compose.animation.shrinkVertically(),
+            ) {
+                ModeHint((navLabel ?: "") +
+                    if (navState.active)
+                        "  ·  long-press to re-goal, joystick to cancel"
+                    else "")
             }
             // Clear one-shot messages once the state moves on.
             LaunchedEffect(navState.state) {
@@ -371,7 +381,7 @@ fun MapScreen(
                         RobotService.startCleaning()
                     }
                 },
-                Modifier.weight(1f).height(48.dp),
+                Modifier.weight(1f).height(48.dp).pressScale(),
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(
                     containerColor =
@@ -389,12 +399,12 @@ fun MapScreen(
             }
             FilledTonalButton(
                 onClick = { RobotService.goDock(ctx) },
-                Modifier.weight(1f).height(48.dp),
+                Modifier.weight(1f).height(48.dp).pressScale(),
                 shape = RoundedCornerShape(50),
             ) { Text("Dock") }
             Button(
                 onClick = { RobotService.setEstop(!eStop) },
-                Modifier.weight(1f).height(48.dp),
+                Modifier.weight(1f).height(48.dp).pressScale(),
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = DangerRed,
@@ -516,19 +526,30 @@ private fun RailButton(icon: ImageVector, desc: String, onClick: () -> Unit) {
 @Composable
 private fun ModeTab(label: String, selected: Boolean, modifier: Modifier,
                     onClick: () -> Unit) {
+    // Phase 4: selection state animates instead of snapping.
+    val bg by androidx.compose.animation.animateColorAsState(
+        targetValue = if (selected) RobotOrange
+        else MaterialTheme.colorScheme.surfaceVariant,
+        animationSpec = androidx.compose.animation.core.tween(200),
+        label = "modeTabBg",
+    )
+    val fg by androidx.compose.animation.animateColorAsState(
+        targetValue = if (selected) Color.White
+        else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = androidx.compose.animation.core.tween(200),
+        label = "modeTabFg",
+    )
     Surface(
         onClick = onClick,
-        modifier = modifier.height(40.dp),
-        shape = RoundedCornerShape(50),
-        color = if (selected) RobotOrange
-        else MaterialTheme.colorScheme.surfaceVariant,
+        modifier = modifier.height(40.dp).pressScale(0.95f),
+        shape = RoundedCornerShape(Rd.Pill),
+        color = bg,
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 label, fontSize = Ts.Body,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                color = if (selected) Color.White
-                else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = fg,
             )
         }
     }

@@ -263,7 +263,7 @@ fun HomeScreen(
                 Spacer(Modifier.height(20.dp))
                 Button(
                     onClick = onEnter,
-                    Modifier.fillMaxWidth().height(52.dp),
+                    Modifier.fillMaxWidth().height(52.dp).pressScale(),
                     shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = RobotOrange,
@@ -370,7 +370,7 @@ private fun RoutineChip(
     onClick: () -> Unit,
 ) {
     Card(
-        modifier = modifier,
+        modifier = modifier.pressScale(),
         shape = RoundedCornerShape(Rd.L),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant

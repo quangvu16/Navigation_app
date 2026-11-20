@@ -206,11 +206,11 @@ fun DriveScreen(modifier: Modifier = Modifier) {
             val dockPhase = RobotService.dockPhase
             OutlinedButton(
                 onClick = { RobotService.setDock(ctx) },
-                Modifier.weight(1f).height(46.dp),
+                Modifier.weight(1f).height(46.dp).pressScale(),
             ) { Text("⚓ Set dock here", fontSize = Ts.Body) }
             Button(
                 onClick = { RobotService.goDock(ctx) },
-                Modifier.weight(1f).height(46.dp),
+                Modifier.weight(1f).height(46.dp).pressScale(),
                 shape = RoundedCornerShape(50),
                 enabled = dockPhase == RobotService.Companion.DockPhase.NONE ||
                     dockPhase == RobotService.Companion.DockPhase.DOCKED,
@@ -233,7 +233,7 @@ fun DriveScreen(modifier: Modifier = Modifier) {
         Spacer(Modifier.height(12.dp))
         Button(
             onClick = { RobotService.setEstop(!eStop) },
-            Modifier.fillMaxWidth().height(52.dp),
+            Modifier.fillMaxWidth().height(52.dp).pressScale(),
             shape = RoundedCornerShape(50),
             colors = ButtonDefaults.buttonColors(
                 containerColor = if (eStop) MaterialTheme.colorScheme.surfaceVariant

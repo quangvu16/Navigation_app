@@ -88,9 +88,13 @@ fun AppNav() {
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            if (linkState == LinkState.ERROR_LINK) {
-                LinkErrorBanner()
-            }
+            androidx.compose.animation.AnimatedVisibility(
+                visible = linkState == LinkState.ERROR_LINK,
+                enter = androidx.compose.animation.fadeIn() +
+                    androidx.compose.animation.expandVertically(),
+                exit = androidx.compose.animation.fadeOut() +
+                    androidx.compose.animation.shrinkVertically(),
+            ) { LinkErrorBanner() }
             val content = Modifier.fillMaxSize()
             when {
                 sub == "maps" -> MapsScreen(
