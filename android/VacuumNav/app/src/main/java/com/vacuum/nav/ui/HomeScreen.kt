@@ -3,6 +3,8 @@ package com.vacuum.nav.ui
 import com.vacuum.nav.ui.theme.*
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -115,9 +117,12 @@ fun HomeScreen(
         return
     }
 
+    // FINDING-013: scrollable - the card + two routine rows overflowed on
+    // small screens and at 1.3x font. weight() below becomes a min-gap.
     Column(
         modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .background(
                 Brush.verticalGradient(
                     listOf(
@@ -126,7 +131,7 @@ fun HomeScreen(
                     )
                 )
             )
-            .padding(20.dp),
+            .padding(Sp.Lg),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(
@@ -180,7 +185,7 @@ fun HomeScreen(
             fontSize = Ts.Body,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(Sp.Lg))
 
         // Robot card (reference: product shot + battery + Enter).
         Card(
@@ -236,7 +241,7 @@ fun HomeScreen(
                         )
                     }
                 }
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(Sp.Lg))
                 // Robot "product shot": the app logo (same art as the
                 // launcher icon) on a soft disc.
                 Box(
@@ -286,7 +291,7 @@ fun HomeScreen(
                         Modifier.weight(1f))
                     StatTile("Next schedule", nextScheduleText, Modifier.weight(1f))
                 }
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(Sp.Lg))
                 Button(
                     onClick = onEnter,
                     Modifier.fillMaxWidth().height(52.dp).pressScale(),
@@ -370,7 +375,7 @@ fun HomeScreen(
             )
         }
 
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(Sp.Xl))
         Text(
             "Stats · ${RunStats.areaText()} cleaned · " +
                 "${RunStats.runs} runs · ${RunStats.timeText()}",
