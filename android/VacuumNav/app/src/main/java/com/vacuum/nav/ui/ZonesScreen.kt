@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -105,6 +106,8 @@ fun ZonesScreen(modifier: Modifier = Modifier) {
     var selectedId by remember { mutableStateOf<Long?>(null) }
     var nextId by remember { mutableStateOf(1000L) }
     var dirty by remember { mutableStateOf(false) }
+    // FINDING-014: clear-all confirms first.
+    var confirmClear by remember { mutableStateOf(false) }
 
     Column(modifier.fillMaxSize().padding(Sp.Md)) {
         Row(
@@ -293,11 +296,7 @@ fun ZonesScreen(modifier: Modifier = Modifier) {
                 Modifier.weight(1f),
             ) { Text("Add zone") }
             OutlinedButton(
-                onClick = {
-                    zones.clear()
-                    selectedId = null
-                    dirty = true
-                },
+                onClick = { confirmClear = true },
                 Modifier.weight(1f),
             ) { Text("Clear all") }
             Button(
@@ -312,5 +311,26 @@ fun ZonesScreen(modifier: Modifier = Modifier) {
                 ),
             ) { Text("Save", fontWeight = FontWeight.Bold) }
         }
+    }
+
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("Clear all zones?") },
+            text = { Text("Every no-go zone will be removed. Save after to keep the change.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    zones.clear()
+                    selectedId = null
+                    dirty = true
+                    confirmClear = false
+                }) { Text("Clear all") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    confirmClear = false
+                }) { Text("Cancel") }
+            },
+        )
     }
 }

@@ -27,8 +27,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.AlertDialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -56,6 +60,8 @@ fun HistoryScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         }
     }
     val fmt = remember { SimpleDateFormat("MMM d, HH:mm", Locale.US) }
+    // FINDING-014: destructive actions confirm first.
+    var confirmClear by remember { mutableStateOf(false) }
 
     Scaffold(modifier = modifier) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
@@ -73,10 +79,9 @@ fun HistoryScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             )
                 Spacer(Modifier.weight(1f))
                 if (runs.isNotEmpty()) {
-                    TextButton(onClick = {
-                        HistoryStore.clear(ctx)
-                        runs.clear()
-                    }) { Text("Clear", fontSize = Ts.Body) }
+                    TextButton(onClick = { confirmClear = true }) {
+                        Text("Clear", fontSize = Ts.Body)
+                    }
                 }
             }
             if (runs.isEmpty()) {
@@ -132,5 +137,23 @@ fun HistoryScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("Clear history?") },
+            text = { Text("All ${runs.size} past runs will be removed. This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    HistoryStore.clear(ctx)
+                    runs.clear()
+                    confirmClear = false
+                }) { Text("Clear") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClear = false }) { Text("Cancel") }
+            },
+        )
     }
 }

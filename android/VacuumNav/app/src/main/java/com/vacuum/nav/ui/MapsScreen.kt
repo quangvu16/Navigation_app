@@ -70,6 +70,8 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     var editing by remember { mutableStateOf<MapMeta?>(null) }
     var newName by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
+    // FINDING-014: delete confirms first (map data is hard to rebuild).
+    var confirmingDelete by remember { mutableStateOf<MapMeta?>(null) }
     val fmt = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }
 
     // SAF picker for map JSON import (no storage permission needed).
@@ -204,9 +206,7 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                                     }
                                 }) { Text("Export", fontSize = Ts.Body) }
                                 TextButton(onClick = {
-                                    MapStore.delete(ctx, m.id)
-                                    maps.remove(m)
-                                    status = "Deleted ${m.name}"
+                                    confirmingDelete = m
                                 }) { Text("Delete", fontSize = Ts.Body) }
                             }
                         }
@@ -240,6 +240,25 @@ fun MapsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             },
             dismissButton = {
                 TextButton(onClick = { editing = null }) { Text("Cancel") }
+            },
+        )
+    }
+
+    confirmingDelete?.let { m ->
+        AlertDialog(
+            onDismissRequest = { confirmingDelete = null },
+            title = { Text("Delete ${m.name}?") },
+            text = { Text("This floor map will be removed. Exported copies are unaffected.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    MapStore.delete(ctx, m.id)
+                    maps.remove(m)
+                    status = "Deleted ${m.name}"
+                    confirmingDelete = null
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingDelete = null }) { Text("Cancel") }
             },
         )
     }
