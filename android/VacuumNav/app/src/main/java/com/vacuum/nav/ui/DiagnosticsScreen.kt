@@ -123,7 +123,10 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 Text(
                     "Last scan: " + when {
                         scanAge < 0 -> "never"
-                        scanAge > 3000 -> "-e s ago (stale)"
+                        // Stale ages show in seconds (ms is unreadable
+                        // past 3 s); both branches interpolate the value.
+                        scanAge > 3000 ->
+                            "%.1f s ago (stale)".format(scanAge / 1000.0)
                         else -> "$scanAge ms ago"
                     },
                     fontSize = Ts.Body,
@@ -132,7 +135,7 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     "Last telemetry: " + when {
                         stats.lastTelemAgeMs < 0 -> "never"
                         stats.lastTelemAgeMs > 1000 ->
-                            " ms ago (stale)"
+                            "${stats.lastTelemAgeMs} ms ago (stale)"
                         else -> "${stats.lastTelemAgeMs} ms ago"
                     },
                     fontSize = Ts.Body,
