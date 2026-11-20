@@ -71,7 +71,7 @@ fun MapScreen(
     onOpenDrive: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val link = RobotService.link
+    val link by RobotService.linkFlow.collectAsState()
     val telemetry by (link?.telemetry
         ?: remember { kotlinx.coroutines.flow.MutableStateFlow(
             com.vacuum.nav.robot.Telemetry()) }).collectAsState()

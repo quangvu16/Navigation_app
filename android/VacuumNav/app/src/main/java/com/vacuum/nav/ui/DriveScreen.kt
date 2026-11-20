@@ -59,7 +59,7 @@ import kotlin.math.abs
 @Composable
 fun DriveScreen(modifier: Modifier = Modifier) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    val link = RobotService.link
+    val link by RobotService.linkFlow.collectAsState()
     val telemetry by (link?.telemetry
         ?: remember { kotlinx.coroutines.flow.MutableStateFlow(
             com.vacuum.nav.robot.Telemetry()) }).collectAsState()

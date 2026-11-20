@@ -49,7 +49,10 @@ fun AppNav() {
     // "" | "maps" | "history" | "diagnostics"
     var sub by rememberSaveable { mutableStateOf("") }
 
-    val linkState by (RobotService.link?.state
+    // Observe linkFlow (not a one-shot RobotService.link read) so the
+    // error banner reacts when the service assigns/switches the link.
+    val link by RobotService.linkFlow.collectAsState()
+    val linkState by (link?.state
         ?: remember { kotlinx.coroutines.flow.MutableStateFlow(
             LinkState.CLAIMED) }).collectAsState()
 

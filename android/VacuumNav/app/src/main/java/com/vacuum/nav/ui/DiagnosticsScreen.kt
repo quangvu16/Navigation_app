@@ -57,7 +57,8 @@ import com.vacuum.nav.service.RobotService
 fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
     val stats by RobotService.linkStats.collectAsState()
-    val telemetry by (RobotService.link?.telemetry
+    val link by RobotService.linkFlow.collectAsState()
+    val telemetry by (link?.telemetry
         ?: remember { kotlinx.coroutines.flow.MutableStateFlow(
             com.vacuum.nav.robot.Telemetry()) }).collectAsState()
     val mapSnap by (RobotService.mapper?.snapshot

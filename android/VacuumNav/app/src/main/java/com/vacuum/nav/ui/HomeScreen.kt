@@ -77,7 +77,10 @@ fun HomeScreen(
     onOpenDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val link = RobotService.link
+    // Observe the link FLOW, not a one-shot read: the Activity composes
+    // before the service assigns the link, and a captured null never
+    // recomposes (the app sat on the loading screen forever).
+    val link by RobotService.linkFlow.collectAsState()
     val telemetry by (link?.telemetry
         ?: remember { kotlinx.coroutines.flow.MutableStateFlow(
             com.vacuum.nav.robot.Telemetry()) }).collectAsState()
@@ -109,7 +112,12 @@ fun HomeScreen(
     // Phase 3 of the redesign (FINDING-005): real loading state while the
     // foreground service spins up the brain.
     if (link == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        // Column, not Box: Box stacked the spinner on top of the label.
+        Column(
+            Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
             CircularProgressIndicator()
             Spacer(Modifier.height(Sp.Md))
             Text("Starting robot brain…", fontSize = Ts.Body)

@@ -375,10 +375,23 @@ class RobotService : Service() {
         private const val CHANNEL_ID = "robot_brain"
         private const val NOTIF_ID = 1
 
+        // Compose-observable mirror of [link]: the Activity routinely
+        // composes BEFORE the service's onCreate assigns the link (async
+        // startForegroundService), and a plain @Volatile read captured in
+        // a val never recomposes - Home sat on "Starting robot brain..."
+        // forever. Every assignment flows through the setter into here.
+        private val _linkFlow =
+            kotlinx.coroutines.flow.MutableStateFlow<RobotLink?>(null)
+        val linkFlow: kotlinx.coroutines.flow.StateFlow<RobotLink?> =
+            _linkFlow.asStateFlow()
+
         /** The brain lives here while the service runs; null otherwise. */
         @Volatile
         var link: RobotLink? = null
-            private set
+            private set(value) {
+                field = value
+                _linkFlow.value = value
+            }
 
         @Volatile
         private var instance: RobotService? = null
